@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 
 local alvo = Workspace:WaitForChild("RenderedMovingAnimals")
@@ -34,9 +35,14 @@ local activeCategories = {
     Test = false
 }
 
--- Criar GUI simples
-local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+-- Criar GUI no CoreGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Name = "ModelTrackerUI"
+ScreenGui.Parent = CoreGui
 
+-- Criar botão
 local function createButton(name, position)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0, 200, 0, 40)
@@ -44,7 +50,10 @@ local function createButton(name, position)
     btn.Text = name.." [OFF]"
     btn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
     btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 18
     btn.Parent = ScreenGui
+
     btn.MouseButton1Click:Connect(function()
         activeCategories[name] = not activeCategories[name]
         if activeCategories[name] then
@@ -57,6 +66,7 @@ local function createButton(name, position)
     end)
 end
 
+-- Criar os 3 botões
 createButton("Secrets", UDim2.new(0, 20, 0, 50))
 createButton("BrainrotGods", UDim2.new(0, 20, 0, 100))
 createButton("Test", UDim2.new(0, 20, 0, 150))
@@ -85,6 +95,7 @@ local function seguirEInteragir(model)
             connection:Disconnect()
             return
         end
+
         -- Seguir modelo
         local targetPos
         if model.PrimaryPart then
