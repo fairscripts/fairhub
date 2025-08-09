@@ -1,0 +1,58 @@
+-- função principal: seguir e interagir enquanto o modelo existir
+local function seguirEInteragirAteSumir(model)
+    if not model or not model.Parent then return end
+
+    local char, humanoid, hrp = waitForCharacterParts(5)
+    if not char or not humanoid or not hrp then
+        warn("[seguirEInteragir] Character/Humanoid/HRP não prontos. Abortando.")
+        return
+    end
+
+    local modelName = model.Name
+    print(("[seguirEInteragir] Iniciando follow em modelo %s"):format(modelName))
+
+    local lastPrint = 0
+    local promptExisted = false
+    local lastFireTime = 0 -- cooldown
+
+    local connection
+    connection = RunService.Heartbeat:Connect(function()
+        if not model or not model.Parent then
+            connection:Disconnect()
+            print(("[seguirEInteragir] Modelo %s removido — parando follow."):format(modelName))
+            return
+        end
+
+        local targetPart = acharParteAlvo(model)
+        if targetPart then
+            local dist = (hrp.Position - targetPart.Position).Magnitude
+            if dist > 2.2 then
+                local ok, err = pcall(function() humanoid:MoveTo(targetPart.Position) end)
+                if not ok and tick() - lastPrint > 3 then
+                    warn("[seguirEInteragir] humanoid:MoveTo falhou:", err)
+                    lastPrint = tick()
+                end
+            end
+        end
+
+        local prompt = acharPrompt(model)
+        if prompt then
+            promptExisted = true
+            if tick() - lastFireTime >= 5 then -- cooldown de 5 segundos
+                local ok = safeFirePrompt(prompt, 2)
+                if ok then
+                    print(("[seguirEInteragir] Interação disparada para %s"):format(modelName))
+                else
+                    warn(("[seguirEInteragir] Falha ao interagir com %s"):format(modelName))
+                end
+                lastFireTime = tick()
+            end
+        else
+            if promptExisted then
+                connection:Disconnect()
+                print(("[seguirEInteragir] Prompt sumiu — parando follow de %s"):format(modelName))
+                return
+            end
+        end
+    end)
+end
