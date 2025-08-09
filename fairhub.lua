@@ -79,7 +79,7 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 18
 title.TextColor3 = Color3.fromRGB(255,255,255)
 
--- Função para criar botões
+-- Criar botões
 local function makeToggle(text, y, key)
     local b = Instance.new("TextButton", frame)
     b.Size = UDim2.new(1, -20, 0, 36)
@@ -127,11 +127,23 @@ local function notify(msg)
     task.delay(4, function() if label then label:Destroy() end end)
 end
 
+-- Função para acionar todos os ProximityPrompts
+local function acionarPrompts(obj)
+    for _, descendant in ipairs(obj:GetDescendants()) do
+        if descendant:IsA("ProximityPrompt") then
+            pcall(function()
+                fireproximityprompt(descendant)
+            end)
+        end
+    end
+end
+
 -- Monitorar apenas RenderedMovingAnimals
 alvo.ChildAdded:Connect(function(obj)
     local g = nameToGroup[obj.Name]
     if g and state[g] then
         notify("["..g.."] "..obj.Name)
         print("Detectado:", "Workspace.RenderedMovingAnimals."..obj.Name)
+        acionarPrompts(obj) -- aciona prompts automaticamente
     end
 end)
