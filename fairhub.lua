@@ -1,60 +1,28 @@
 -- Serviços
-local Workspace = game:GetService("Workspace")
-local StarterGui = game:GetService("StarterGui")
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local StarterGui = game:GetService("StarterGui")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Função para inserir UI no lugar certo
-local function criarScreenGui()
-    local parentGui
-    if gethui then
-        parentGui = gethui() -- Preferido em executores
-    else
-        parentGui = game:GetService("CoreGui")
-    end
-    local gui = Instance.new("ScreenGui")
-    gui.IgnoreGuiInset = true
-    gui.Name = "DetectorUI"
-    gui.Parent = parentGui
-    return gui
-end
+-- Pasta alvo
+local alvo = Workspace:WaitForChild("RenderedMovingAnimals")
 
--- Configuração dos grupos e nomes
-local grupos = {
+-- Listas de RNGs
+local groups = {
     Secrets = {
-        "La Vacca Saturno Saturnita",
-        "Chimpanzini Spiderini",
-        "Agarrini la Palini",
-        "Los Tralaleritos",
-        "Las Tralaleritas",
-        "Las Vaquitas Saturnitas",
-        "Graipuss Medussi",
-        "Chicleteira Bicicleteira",
-        "La Grande Combinasion",
-        "Los Combinasionas",
-        "Nuclearo Dinossauro",
-        "Garama and Madundung",
-        "Dragon Cannelloni",
-        "Secret Lucky Block",
-        "Pot Hotspot"
+        "La Vacca Saturno Saturnita","Chimpanzini Spiderini","Agarrini la Palini",
+        "Los Tralaleritos","Las Tralaleritas","Las Vaquitas Saturnitas",
+        "Graipuss Medussi","Chicleteira Bicicleteira","La Grande Combinasion",
+        "Los Combinasionas","Nuclearo Dinossauro","Garama and Madundung",
+        "Dragon Cannelloni","Secret Lucky Block","Pot Hotspot"
     },
     BrainrotGods = {
-        "Cocofanto Elefanto",
-        "Girafa Celestre",
-        "Gattatino Neonino",
-        "Matteo",
-        "Tralalero Tralala",
-        "Los Crocodillitos",
-        "Espresso Signora",
-        "Odin Din Din Dun",
-        "Statutino Libertino",
-        "Tukanno Bananno",
-        "Trenostruzzo Turbo 3000",
-        "Trippi Troppi Troppa Trippa",
-        "Ballerino Lololo",
-        "Los Tungtungtungcitos",
-        "Piccione Macchina",
-        "Brainrot God Lucky Block",
+        "Cocofanto Elefanto","Girafa Celestre","Gattatino Neonino","Matteo",
+        "Tralalero Tralala","Los Crocodillitos","Espresso Signora",
+        "Odin Din Din Dun","Statutino Libertino","Tukanno Bananno",
+        "Trenostruzzo Turbo 3000","Trippi Troppi Troppa Trippa","Ballerino Lololo",
+        "Los Tungtungtungcitos","Piccione Macchina","Brainrot God Lucky Block",
         "Orcalero Orcala"
     },
     Test = {
@@ -62,64 +30,108 @@ local grupos = {
     }
 }
 
--- Estado dos botões
-local estado = {
-    Secrets = false,
-    BrainrotGods = false,
-    Test = false
-}
-
--- Função de notificação na tela
-local function notificar(msg)
-    pcall(function()
-        StarterGui:SetCore("SendNotification", {
-            Title = "🚨 Objeto detectado!",
-            Text = msg,
-            Duration = 5
-        })
-    end)
+-- Lookup rápido
+local nameToGroup = {}
+for g, list in pairs(groups) do
+    for _, n in ipairs(list) do
+        nameToGroup[n] = g
+    end
 end
 
--- Monitorar Workspace
-Workspace.ChildAdded:Connect(function(obj)
-    for grupo, lista in pairs(grupos) do
-        if estado[grupo] then
-            for _, nome in ipairs(lista) do
-                if obj.Name == nome then
-                    notificar("[" .. grupo .. "] " .. nome)
-                end
-            end
+-- Estado dos botões
+local state = { Secrets = false, BrainrotGods = false, Test = false }
+
+-- Criar container da UI
+local function createGuiContainer()
+    local ok, container
+    if type(gethui) == "function" then
+        ok, container = pcall(gethui)
+        if ok and typeof(container) == "Instance" then
+        else
+            container = nil
         end
     end
-end)
+    container = container or PlayerGui
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "DetectorUI_"..tostring(math.random(1000,9999))
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.Parent = container
+    return gui
+end
 
--- Criar UI
-local ScreenGui = criarScreenGui()
+local gui = createGuiContainer()
 
-local function criarBotao(texto, ordem, chave)
-    local botao = Instance.new("TextButton")
-    botao.Size = UDim2.new(0, 200, 0, 50)
-    botao.Position = UDim2.new(0, 20, 0, 20 + (ordem * 60))
-    botao.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
-    botao.TextColor3 = Color3.fromRGB(255, 255, 255)
-    botao.Font = Enum.Font.GothamBold
-    botao.TextSize = 16
-    botao.Text = texto .. ": OFF"
-    botao.Parent = ScreenGui
+-- Criar frame base
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 220, 0, 170)
+frame.Position = UDim2.new(0, 10, 0, 60)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+frame.BorderSizePixel = 0
+frame.BackgroundTransparency = 0.02
 
-    botao.MouseButton1Click:Connect(function()
-        estado[chave] = not estado[chave]
-        if estado[chave] then
-            botao.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-            botao.Text = texto .. ": ON"
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,34)
+title.BackgroundTransparency = 1
+title.Text = "RNG Detector"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.TextColor3 = Color3.fromRGB(255,255,255)
+
+-- Função para criar botões
+local function makeToggle(text, y, key)
+    local b = Instance.new("TextButton", frame)
+    b.Size = UDim2.new(1, -20, 0, 36)
+    b.Position = UDim2.new(0, 10, 0, 34 + y)
+    b.BackgroundColor3 = Color3.fromRGB(170,0,0)
+    b.TextColor3 = Color3.fromRGB(255,255,255)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 15
+    b.Text = text.." : OFF"
+    b.MouseButton1Click:Connect(function()
+        state[key] = not state[key]
+        if state[key] then
+            b.BackgroundColor3 = Color3.fromRGB(0,170,0)
+            b.Text = text.." : ON"
         else
-            botao.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
-            botao.Text = texto .. ": OFF"
+            b.BackgroundColor3 = Color3.fromRGB(170,0,0)
+            b.Text = text.." : OFF"
         end
     end)
 end
 
--- Criar botões
-criarBotao("Secrets", 0, "Secrets")
-criarBotao("BrainrotGods", 1, "BrainrotGods")
-criarBotao("Test", 2, "Test")
+makeToggle("Secrets", 6, "Secrets")
+makeToggle("BrainrotGods", 46, "BrainrotGods")
+makeToggle("Test", 86, "Test")
+
+-- Função de notificação
+local function notify(msg)
+    local success = pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = "Detector",
+            Text = msg,
+            Duration = 4
+        })
+    end)
+    if success then return end
+    local label = Instance.new("TextLabel", gui)
+    label.Size = UDim2.new(0.6,0,0,40)
+    label.Position = UDim2.new(0.2,0,0.02,0)
+    label.BackgroundColor3 = Color3.fromRGB(25,25,25)
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 16
+    label.Text = msg
+    label.BorderSizePixel = 0
+    task.delay(4, function() if label then label:Destroy() end end)
+end
+
+-- Monitorar apenas RenderedMovingAnimals
+alvo.ChildAdded:Connect(function(obj)
+    local g = nameToGroup[obj.Name]
+    if g and state[g] then
+        notify("["..g.."] "..obj.Name)
+        print("Detectado:", "Workspace.RenderedMovingAnimals."..obj.Name)
+    end
+end)
