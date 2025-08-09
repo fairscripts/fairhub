@@ -16,7 +16,7 @@ else
     warn("[Script] Nenhuma função fireproximityprompt disponível")
 end
 
--- Listas de nomes
+-- Listas case-sensitive
 local groups = {
     Secrets = {
         "La Vacca Saturno Saturnita","Chimpanzini Spiderini","Agarrini la Palini",
@@ -42,15 +42,15 @@ local movingFolder = Workspace:WaitForChild("MovingAnimals")
 local renderedFolder = Workspace:WaitForChild("RenderedMovingAnimals")
 
 -- Mapas
-local movingByDisplay = {}   -- [displayName] = { modelos }
-local renderedByDisplay = {} -- [displayName] = { modelos }
+local movingByDisplay = {}   -- [DisplayName] = { modelos }
+local renderedByDisplay = {} -- [DisplayName] = { modelos }
 
--- Checa se displayName está nas listas ativas
-local function isSelectedDisplay(displayName)
+-- Checa se DisplayName está nas listas ativas
+local function isSelectedDisplay(DisplayName)
     for cat,list in pairs(groups) do
         if active[cat] then
             for _,name in ipairs(list) do
-                if name == displayName then
+                if name == DisplayName then
                     return true
                 end
             end
@@ -59,13 +59,13 @@ local function isSelectedDisplay(displayName)
     return false
 end
 
--- Achar DisplayName dentro de um modelo
+-- Lê exatamente HumanoidRootPart.Info.DisplayName
 local function getDisplayName(model)
     local hrp = model:FindFirstChild("HumanoidRootPart")
     if not hrp then return nil end
     local info = hrp:FindFirstChild("Info")
     if not info then return nil end
-    local lbl = info:FindFirstChild("DisplayName", true)
+    local lbl = info:FindFirstChild("DisplayName")
     if lbl and lbl:IsA("TextLabel") then
         return lbl.Text
     end
@@ -106,9 +106,10 @@ end
 
 -- Quando PromptShown em Rendered -> dispara prompt correspondente no Moving
 PPS.PromptShown:Connect(function(prompt)
-    local displayName = getDisplayName(prompt:FindFirstAncestorWhichIsA("Model"))
-    if displayName and movingByDisplay[displayName] then
-        for _,movingModel in ipairs(movingByDisplay[displayName]) do
+    local model = prompt:FindFirstAncestorWhichIsA("Model")
+    local DisplayName = model and getDisplayName(model)
+    if DisplayName and movingByDisplay[DisplayName] then
+        for _,movingModel in ipairs(movingByDisplay[DisplayName]) do
             interactWithPrompt(movingModel)
         end
     end
@@ -116,14 +117,14 @@ end)
 
 -- Registrar modelo em MovingAnimals
 local function registerMoving(model)
-    local displayName = getDisplayName(model)
-    if not displayName then return end
-    movingByDisplay[displayName] = movingByDisplay[displayName] or {}
-    table.insert(movingByDisplay[displayName], model)
-    print("[Moving] Registrado:", displayName)
+    local DisplayName = getDisplayName(model)
+    if not DisplayName then return end
+    movingByDisplay[DisplayName] = movingByDisplay[DisplayName] or {}
+    table.insert(movingByDisplay[DisplayName], model)
+    print("[Moving] Registrado:", DisplayName)
 
-    if isSelectedDisplay(displayName) and renderedByDisplay[displayName] then
-        for _,rendModel in ipairs(renderedByDisplay[displayName]) do
+    if isSelectedDisplay(DisplayName) and renderedByDisplay[DisplayName] then
+        for _,rendModel in ipairs(renderedByDisplay[DisplayName]) do
             followModel(rendModel)
         end
     end
@@ -131,13 +132,13 @@ end
 
 -- Registrar modelo em RenderedMovingAnimals
 local function registerRendered(model)
-    local displayName = getDisplayName(model)
-    if not displayName then return end
-    renderedByDisplay[displayName] = renderedByDisplay[displayName] or {}
-    table.insert(renderedByDisplay[displayName], model)
-    print("[Rendered] Registrado:", displayName)
+    local DisplayName = getDisplayName(model)
+    if not DisplayName then return end
+    renderedByDisplay[DisplayName] = renderedByDisplay[DisplayName] or {}
+    table.insert(renderedByDisplay[DisplayName], model)
+    print("[Rendered] Registrado:", DisplayName)
 
-    if isSelectedDisplay(displayName) and movingByDisplay[displayName] then
+    if isSelectedDisplay(DisplayName) and movingByDisplay[DisplayName] then
         followModel(model)
     end
 end
@@ -179,4 +180,4 @@ do
     makeBtn("Test", 80)
 end
 
-print("[Script] Pronto para monitorar por DisplayName.")
+print("[Script] Pronto para monitorar DisplayName case-sensitive.")
