@@ -128,13 +128,11 @@ local function notify(msg)
     task.delay(4, function() if label then label:Destroy() end end)
 end
 
--- Função para seguir e interagir
+-- Função para seguir e interagir sem depender da distância
 local function seguirEInteragir(obj)
     local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     if not humanoid then return end
-
-    local promptAtivado = false
 
     local conn
     conn = RunService.Heartbeat:Connect(function()
@@ -156,15 +154,14 @@ local function seguirEInteragir(obj)
 
         if targetPart then
             humanoid:MoveTo(targetPart.Position)
-            if prompt and (LocalPlayer:DistanceFromCharacter(targetPart.Position) <= (prompt.MaxActivationDistance or 10)) then
-                if not promptAtivado then
-                    pcall(function()
-                        fireproximityprompt(prompt)
-                        promptAtivado = true
-                    end)
-                    conn:Disconnect()
-                end
-            end
+        end
+
+        if prompt then
+            prompt.Enabled = true
+            pcall(function()
+                fireproximityprompt(prompt, 1) -- segura por 1s
+            end)
+            conn:Disconnect()
         end
     end)
 end
