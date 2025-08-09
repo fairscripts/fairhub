@@ -21,7 +21,8 @@ local lists = {
         "Garama and Madundung",
         "Dragon Cannelloni",
         "Secret Lucky Block",
-        "Pot Hotspot"
+        "Pot Hotspot",
+        "Los Hotspotsitos"
     },
     BrainrotGods = {
         "Cocofanto Elefanto",
