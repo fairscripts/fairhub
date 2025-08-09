@@ -1,211 +1,145 @@
--- Logger + Interação para ProximityPrompts em Workspace.RenderedMovingAnimals
+-- Serviços
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
-local PPS = game:GetService("ProximityPromptService")
-local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
 
-local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
-
--- pasta alvo
 local alvo = Workspace:WaitForChild("RenderedMovingAnimals")
 
--- util: monta o caminho completo do objeto
-local function getPath(obj)
-    if not obj then return "nil" end
-    local parts = {}
-    local cur = obj
-    while cur and cur ~= game do
-        table.insert(parts, 1, cur.Name)
-        cur = cur.Parent
-    end
-    return table.concat(parts, ".")
-end
+-- Listas de nomes
+local SecretsList = {
+    "La Vacca Saturno Saturnita","Chimpanzini Spiderini","Agarrini la Palini",
+    "Los Tralaleritos","Las Tralaleritas","Las Vaquitas Saturnitas",
+    "Graipuss Medussi","Chicleteira Bicicleteira","La Grande Combinasion",
+    "Los Combinasionas","Nuclearo Dinossauro","Garama and Madundung",
+    "Dragon Cannelloni","Secret Lucky Block","Pot Hotspot"
+}
 
--- util: print formatado (timestamp + caminho + detalhes)
-local function log(fmt, ...)
-    local ts = os.date("%H:%M:%S")
-    local args = {...}
-    for i=1,#args do
-        if typeof(args[i]) == "Instance" then
-            args[i] = getPath(args[i])
+local BrainrotGodsList = {
+    "Cocofanto Elefanto","Girafa Celestre","Gattatino Neonino","Matteo",
+    "Tralalero Tralala","Los Crocodillitos","Espresso Signora","Odin Din Din Dun",
+    "Statutino Libertino","Tukanno Bananno","Trenostruzzo Turbo 3000",
+    "Trippi Troppi Troppa Trippa","Ballerino Lololo","Los Tungtungtungcitos",
+    "Piccione Macchina","Brainrot God Lucky Block","Orcalero Orcala"
+}
+
+local TestList = {
+    "Tung Tung Tung Sahur"
+}
+
+-- Estado de ativação
+local activeCategories = {
+    Secrets = false,
+    BrainrotGods = false,
+    Test = false
+}
+
+-- Criar GUI simples
+local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+
+local function createButton(name, position)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 200, 0, 40)
+    btn.Position = position
+    btn.Text = name.." [OFF]"
+    btn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Parent = ScreenGui
+    btn.MouseButton1Click:Connect(function()
+        activeCategories[name] = not activeCategories[name]
+        if activeCategories[name] then
+            btn.Text = name.." [ON]"
+            btn.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
         else
-            args[i] = tostring(args[i])
+            btn.Text = name.." [OFF]"
+            btn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
         end
-    end
-    print(string.format("[%s] %s", ts, string.format(fmt, unpack(args))))
+    end)
 end
 
--- tabela pra guardar prompts que já estamos monitorando
-local monitored = {}
+createButton("Secrets", UDim2.new(0, 20, 0, 50))
+createButton("BrainrotGods", UDim2.new(0, 20, 0, 100))
+createButton("Test", UDim2.new(0, 20, 0, 150))
 
-local function attachPrompt(prompt)
-    if not prompt or monitored[prompt] then return end
-    monitored[prompt] = true
-    pcall(function()
-        prompt.PromptShown:Connect(function(inputType)
-            log("PromptShown -> %s (inputType=%s)", prompt, tostring(inputType))
-        end)
-    end)
-    pcall(function()
-        prompt.PromptHidden:Connect(function(inputType)
-            log("PromptHidden -> %s (inputType=%s)", prompt, tostring(inputType))
-        end)
-    end)
-    pcall(function()
-        prompt.Triggered:Connect(function(...)
-            local args = {...}
-            if #args == 0 then
-                log("Prompt.Triggered (no args) -> %s", prompt)
-            else
-                local s = ""
-                for i=1,#args do s = s .. tostring(args[i]) .. (i<#args and ", " or "") end
-                log("Prompt.Triggered -> %s (args=%s)", prompt, s)
-            end
-        end)
-    end)
-    log("Attached to prompt: %s", prompt)
-end
-
--- funções do serviço
-pcall(function()
-    PPS.PromptShown:Connect(function(prompt, inputType)
-        log("Service.PromptShown -> %s (inputType=%s)", prompt, tostring(inputType))
-    end)
-end)
-pcall(function()
-    PPS.PromptHidden:Connect(function(prompt, inputType)
-        log("Service.PromptHidden -> %s (inputType=%s)", prompt, tostring(inputType))
-    end)
-end)
-pcall(function()
-    PPS.PromptTriggered:Connect(function(prompt, player)
-        log("Service.PromptTriggered -> %s (player=%s)", prompt, player and player.Name or "nil")
-    end)
-end)
-
--- varre um ancestor (ex: model/pasta) em busca de ProximityPrompts
-local function scanForPrompts(root)
-    for _, desc in ipairs(root:GetDescendants()) do
+-- Função para buscar prompt recursivamente
+local function acharPrompt(model)
+    for _,desc in ipairs(model:GetDescendants()) do
         if desc:IsA("ProximityPrompt") then
-            attachPrompt(desc)
+            return desc
         end
     end
+    return nil
 end
 
-log("Iniciando scan inicial em %s", getPath(alvo))
-scanForPrompts(alvo)
+-- Função para seguir modelo e interagir
+local function seguirEInteragir(model)
+    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
 
-alvo.DescendantAdded:Connect(function(desc)
-    if desc:IsA("ProximityPrompt") then
-        attachPrompt(desc)
-    elseif desc:IsA("Model") or desc:IsA("Folder") or desc:IsA("BasePart") then
-        task.defer(function()
-            scanForPrompts(desc)
-        end)
-    end
-end)
-
--- encontra o prompt mais próximo do jogador
-local function findNearestPrompt(maxDist)
-    local char = LocalPlayer.Character
-    local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart)
-    if not hrp then return nil, math.huge end
-    local best, bestDist = nil, math.huge
-    for promptObj,_ in pairs(monitored) do
-        if promptObj and promptObj.Parent then
-            local parent = promptObj.Parent
-            local pos
-            if parent:IsA("BasePart") then
-                pos = parent.Position
-            elseif parent:IsA("Model") and parent.PrimaryPart then
-                pos = parent.PrimaryPart.Position
-            else
-                local bp = parent:FindFirstChildWhichIsA("BasePart", true)
-                if bp then pos = bp.Position end
-            end
-            if pos then
-                local d = (hrp.Position - pos).Magnitude
-                if d < bestDist then
-                    bestDist = d
-                    best = promptObj
-                end
-            end
-        end
-    end
-    if bestDist <= (maxDist or 10) then
-        return best, bestDist
-    else
-        return nil, bestDist
-    end
-end
-
--- função para interagir com prompt
-local function interagirPrompt(prompt, holdTime)
-    holdTime = holdTime or 2
-    if not prompt or not prompt:IsA("ProximityPrompt") then
-        log("Prompt inválido para interação.")
-        return
-    end
-
-    -- mover até prompt
-    local parent = prompt.Parent
-    local pos
-    if parent:IsA("BasePart") then
-        pos = parent.Position
-    elseif parent:IsA("Model") and parent.PrimaryPart then
-        pos = parent.PrimaryPart.Position
-    else
-        local bp = parent:FindFirstChildWhichIsA("BasePart", true)
-        if bp then pos = bp.Position end
-    end
-    if pos then
-        local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid:MoveTo(pos)
-            humanoid.MoveToFinished:Wait(holdTime)
-        end
-    end
-
-    -- tentar interação
     local firePrompt = (typeof(fireproximityprompt) == "function" and fireproximityprompt)
         or (typeof(fireProximityPrompt) == "function" and fireProximityPrompt)
 
-    if firePrompt then
-        pcall(function() firePrompt(prompt, holdTime) end)
-    elseif game:GetService("VirtualInputManager") then
-        local VIM = game:GetService("VirtualInputManager")
-        VIM:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-        task.wait(holdTime)
-        VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-    else
-        log("Nenhum método de interação disponível para %s", prompt)
-    end
+    local connection
+    connection = RunService.Heartbeat:Connect(function()
+        if not model or not model.Parent then
+            connection:Disconnect()
+            return
+        end
+        -- Seguir modelo
+        local targetPos
+        if model.PrimaryPart then
+            targetPos = model.PrimaryPart.Position
+        else
+            local rootPart = model:FindFirstChild("RootPart") or model:FindFirstChild("FakeRootPart")
+            if rootPart then targetPos = rootPart.Position end
+        end
+        if targetPos then
+            humanoid:MoveTo(targetPos)
+        end
+
+        -- Procurar prompt
+        local prompt = acharPrompt(model)
+        if prompt then
+            if firePrompt then
+                pcall(function() firePrompt(prompt, 2) end)
+            else
+                local VIM = game:GetService("VirtualInputManager")
+                VIM:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                task.wait(2)
+                VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            end
+            connection:Disconnect()
+        end
+    end)
 end
 
--- interagir ao apertar E
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.E then
-        local prompt, dist = findNearestPrompt(12)
-        if prompt then
-            interagirPrompt(prompt, 5)
-        else
-            log("Nenhum prompt próximo (dist mais próxima = %.2f)", dist)
+-- Checar se nome está numa lista ativada
+local function nomeSelecionado(nome)
+    if activeCategories.Secrets then
+        for _,v in ipairs(SecretsList) do
+            if v == nome then return true end
         end
     end
-end)
+    if activeCategories.BrainrotGods then
+        for _,v in ipairs(BrainrotGodsList) do
+            if v == nome then return true end
+        end
+    end
+    if activeCategories.Test then
+        for _,v in ipairs(TestList) do
+            if v == nome then return true end
+        end
+    end
+    return false
+end
 
--- interagir automaticamente quando prompt novo aparecer
-alvo.DescendantAdded:Connect(function(desc)
-    if desc:IsA("ProximityPrompt") then
-        task.delay(0.5, function()
-            local prompt, dist = findNearestPrompt(12)
-            if prompt then
-                interagirPrompt(prompt, 5)
+-- Quando um modelo novo aparecer
+alvo.ChildAdded:Connect(function(model)
+    if model:IsA("Model") then
+        task.spawn(function()
+            if nomeSelecionado(model.Name) then
+                seguirEInteragir(model)
             end
         end)
     end
 end)
-
-log("Atualmente monitorando prompts: %d", (function() local c=0; for _ in pairs(monitored) do c=c+1 end; return c end)())
