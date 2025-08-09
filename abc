@@ -1,8 +1,3 @@
--- Monitor sincronizado MovingAnimals <-> RenderedMovingAnimals
---  - usa listas (Secrets / BrainrotGods / Test) e GUI (CoreGui)
---  - segue o modelo em RenderedMovingAnimals com o mesmo nome/ID
---  - ao aparecer ProximityPrompt em RenderedMovingAnimals, dispara fireproximityprompt no modelo correspondente em MovingAnimals
-
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
@@ -11,18 +6,17 @@ local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
--- detecta função fireproximityprompt de forma segura
+-- Detectar função de interação
 local firePromptFn
 if typeof(fireproximityprompt) == "function" then
     firePromptFn = fireproximityprompt
 elseif typeof(fireProximityPrompt) == "function" then
     firePromptFn = fireProximityPrompt
 else
-    firePromptFn = nil
-    warn("[Sync] Nenhuma função fireproximityprompt encontrada neste executor.")
+    warn("[Script] Nenhuma função fireproximityprompt disponível")
 end
 
--- listas (as mesmas que você passou)
+-- Listas de nomes
 local groups = {
     Secrets = {
         "La Vacca Saturno Saturnita","Chimpanzini Spiderini","Agarrini la Palini",
@@ -39,60 +33,21 @@ local groups = {
         "Los Tungtungtungcitos","Piccione Macchina","Brainrot God Lucky Block",
         "Orcalero Orcala"
     },
-    Test = {
-        "Tung Tung Tung Sahur"
-    }
+    Test = { "Tung Tung Tung Sahur" }
 }
-
--- estado de ativação por categoria (GUI controla)
 local active = { Secrets = false, BrainrotGods = false, Test = false }
 
--- pastas alvo
+-- Pastas
 local movingFolder = Workspace:WaitForChild("MovingAnimals")
 local renderedFolder = Workspace:WaitForChild("RenderedMovingAnimals")
 
--- tabelas de estado
--- movingById[id] = { model = Instance, displayName = string, displayLabel = Instance (TextLabel), prompts = {list of ProximityPrompt instances} }
-local movingById = {}
--- renderedById[id] = { model = Instance, followConn = RBXScriptConnection (optional) }
-local renderedById = {}
+-- Mapas
+local movingByDisplay = {}   -- [displayName] = { modelos }
+local renderedByDisplay = {} -- [displayName] = { modelos }
 
--- util: busca DisplayName TextLabel recursivamente dentro de HumanoidRootPart.Info
-local function findDisplayLabelInMoving(model)
-    if not model then return nil end
-    local hrp = model:FindFirstChild("HumanoidRootPart")
-    if not hrp then return nil end
-    local info = hrp:FindFirstChild("Info")
-    if not info then return nil end
-    -- procurar por "DisplayName" TextLabel recursivamente
-    local label = info:FindFirstChild("DisplayName", true)
-    if label and label:IsA("TextLabel") then
-        return label
-    end
-    -- fallback: procurar qualquer TextLabel chamado DisplayName independentemente da hierarquia
-    for _,v in ipairs(info:GetDescendants()) do
-        if v:IsA("TextLabel") and v.Name == "DisplayName" then
-            return v
-        end
-    end
-    return nil
-end
-
--- util: encontra qualquer ProximityPrompt dentro de um model (moving model)
-local function findAnyPromptInModel(model)
-    if not model then return nil end
-    for _,desc in ipairs(model:GetDescendants()) do
-        if desc:IsA("ProximityPrompt") then
-            return desc
-        end
-    end
-    return nil
-end
-
--- retorna true se displayName estiver marcado/selecionado pela GUI nas listas
+-- Checa se displayName está nas listas ativas
 local function isSelectedDisplay(displayName)
-    if not displayName then return false end
-    for cat, list in pairs(groups) do
+    for cat,list in pairs(groups) do
         if active[cat] then
             for _,name in ipairs(list) do
                 if name == displayName then
@@ -104,276 +59,107 @@ local function isSelectedDisplay(displayName)
     return false
 end
 
--- segue um modelo em RenderedMovingAnimals até ser removido
-local function startFollowRenderedModel(renderModel)
-    if not renderModel or not renderModel.Parent then return end
-    local id = renderModel.Name
-    if renderedById[id] and renderedById[id].following then
-        -- já seguindo
-        return
+-- Achar DisplayName dentro de um modelo
+local function getDisplayName(model)
+    local hrp = model:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+    local info = hrp:FindFirstChild("Info")
+    if not info then return nil end
+    local lbl = info:FindFirstChild("DisplayName", true)
+    if lbl and lbl:IsA("TextLabel") then
+        return lbl.Text
     end
-
-    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-    local hrp = LocalPlayer.Character and (LocalPlayer.Character:FindFirstChild("HumanoidRootPart") or LocalPlayer.Character.PrimaryPart)
-    if not humanoid or not hrp then
-        warn("[Sync] Character/Humanoid/HRP não pronto para seguir.")
-        return
-    end
-
-    print(("[[Sync] START FOLLOW rendered '%s' (id=%s)"):format(renderModel.Name, id))
-
-    -- conecta Heartbeat para seguir
-    local conn
-    conn = RunService.Heartbeat:Connect(function()
-        if not renderModel or not renderModel.Parent then
-            print(("[[Sync] STOP FOLLOW rendered '%s' (removido)"):format(id))
-            conn:Disconnect()
-            if renderedById[id] then renderedById[id].following = nil end
-            return
-        end
-
-        -- tentar achar parte alvo (HumanoidRootPart / RootPart / PrimaryPart / qualquer BasePart)
-        local targetPart = renderModel:FindFirstChild("HumanoidRootPart") or renderModel:FindFirstChild("RootPart") or renderModel.PrimaryPart
-        if not targetPart then
-            for _,v in ipairs(renderModel:GetDescendants()) do
-                if v:IsA("BasePart") then
-                    targetPart = v
-                    break
-                end
-            end
-        end
-
-        if targetPart then
-            -- MoveTo atualizado (tenta reduzir chamadas repetidas)
-            local ok, err = pcall(function() humanoid:MoveTo(targetPart.Position) end)
-            if not ok then
-                -- não spammamos warn constantemente
-                -- warn("[Sync] humanoid:MoveTo falhou:", err)
-            end
-        end
-    end)
-
-    renderedById[id] = renderedById[id] or {}
-    renderedById[id].model = renderModel
-    renderedById[id].following = conn
+    return nil
 end
 
--- quando um ProximityPrompt for mostrado (serviço), se ele for dentro de um rendered model que estivermos seguindo
--- então disparamos o ProximityPrompt correspondente em MovingAnimals (mesmo id)
-PPS.PromptShown:Connect(function(prompt, inputType)
-    if not prompt then return end
+-- Seguir modelo até ser destruído
+local function followModel(model)
+    if not model or not model.Parent then return end
+    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
 
-    -- achar qual Rendered model contém este prompt (subida por PromptShown)
-    local ancestor = prompt
-    while ancestor and ancestor.Parent do
-        ancestor = ancestor.Parent
-        if ancestor and ancestor.Parent == renderedFolder and ancestor:IsA("Model") then
-            -- ancestor é o model em RenderedMovingAnimals
-            local id = ancestor.Name
-            -- checar se temos esse id mapeado em movingById e se o displayName selecionado
-            local movingEntry = movingById[id]
-            local selected = movingEntry and isSelectedDisplay(movingEntry.displayName)
-            local following = renderedById[id] and renderedById[id].following
-            -- só faz ação se:
-            --  - o MovingAnimals tem entry com display selecionado
-            --  - e este rendered model está sendo seguido (ou tem entry)
-            if movingEntry and selected and (renderedById[id] and renderedById[id].following) then
-                -- tentar achar prompt correspondente em MovingAnimals model
-                local movingModel = movingEntry.model
-                if movingModel and movingModel.Parent then
-                    -- procuramos qualquer prompt dentro do movingModel
-                    local promptToFire = findAnyPromptInModel(movingModel)
-                    if promptToFire and firePromptFn then
-                        pcall(function()
-                            print(("[Sync] PromptShown em Rendered('%s') -> disparando fireprompt no Moving('%s')"):format(id, id))
-                            firePromptFn(promptToFire, 2) -- hold 2s
-                        end)
-                    else
-                        -- não achou prompt no moving model
-                        print(("[Sync] PromptShown em Rendered('%s') mas não encontrei ProximityPrompt no MovingAnimals('%s') ou fireproximityprompt indisponível"):format(id, id))
-                    end
-                else
-                    print(("[Sync] PromptShown mas Moving model '%s' não encontrado no MovingAnimals"):format(id))
-                end
-            end
+    print("[Follow] Seguindo modelo:", model.Name)
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        if not model or not model.Parent then
+            conn:Disconnect()
+            print("[Follow] Modelo destruído, parando.")
+            return
+        end
+        local target = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart")
+        if target then
+            humanoid:MoveTo(target.Position)
+        end
+    end)
+end
 
-            -- encontrou ancestor model, interrompe loop
-            break
+-- Interagir com prompt de modelo em MovingAnimals
+local function interactWithPrompt(movingModel)
+    local prompt = movingModel and movingModel:FindFirstChildWhichIsA("ProximityPrompt", true)
+    if prompt and firePromptFn then
+        print("[Interact] Disparando prompt em", movingModel.Name)
+        firePromptFn(prompt, 2)
+    else
+        warn("[Interact] Nenhum prompt encontrado em", movingModel and movingModel.Name or "nil")
+    end
+end
+
+-- Quando PromptShown em Rendered -> dispara prompt correspondente no Moving
+PPS.PromptShown:Connect(function(prompt)
+    local displayName = getDisplayName(prompt:FindFirstAncestorWhichIsA("Model"))
+    if displayName and movingByDisplay[displayName] then
+        for _,movingModel in ipairs(movingByDisplay[displayName]) do
+            interactWithPrompt(movingModel)
         end
     end
 end)
 
--- rotinas para gerenciar movingById (quando modelos aparecem em MovingAnimals)
-local function registerMovingModel(model)
-    if not model or not model:IsA("Model") then return end
-    local id = model.Name
-    -- criar entry
-    movingById[id] = movingById[id] or { model = model, displayName = nil, label = nil }
+-- Registrar modelo em MovingAnimals
+local function registerMoving(model)
+    local displayName = getDisplayName(model)
+    if not displayName then return end
+    movingByDisplay[displayName] = movingByDisplay[displayName] or {}
+    table.insert(movingByDisplay[displayName], model)
+    print("[Moving] Registrado:", displayName)
 
-    -- achar label de displayName
-    local label = findDisplayLabelInMoving(model)
-    if label then
-        movingById[id].displayName = label.Text or ""
-        movingById[id].label = label
-    else
-        movingById[id].displayName = nil
-        movingById[id].label = nil
-    end
-
-    print(("[Sync] Moving model registered: id=%s, displayName=%s"):format(id, tostring(movingById[id].displayName)))
-
-    -- listener para mudanças no texto (se houver label)
-    if label then
-        -- evita duplicar conexões: desconecta se já houver uma
-        if movingById[id].labelConn then
-            pcall(function() movingById[id].labelConn:Disconnect() end)
-            movingById[id].labelConn = nil
-        end
-        local conn = label:GetPropertyChangedSignal("Text"):Connect(function()
-            local newText = label.Text or ""
-            movingById[id].displayName = newText
-            print(("[Sync] Moving model id=%s DisplayName changed -> %s"):format(id, newText))
-            -- se novo display está selecionado e já existe rendered model -> start follow
-            if isSelectedDisplay(newText) then
-                local rend = renderedById[id] and renderedById[id].model
-                if rend and rend.Parent then
-                    startFollowRenderedModel(rend)
-                end
-            end
-        end)
-        movingById[id].labelConn = conn
-    end
-
-    -- também recolher prompts já existentes (não estritamente necessário aqui, mas mantemos)
-    movingById[id].prompts = {}
-    for _,desc in ipairs(model:GetDescendants()) do
-        if desc:IsA("ProximityPrompt") then
-            table.insert(movingById[id].prompts, desc)
+    if isSelectedDisplay(displayName) and renderedByDisplay[displayName] then
+        for _,rendModel in ipairs(renderedByDisplay[displayName]) do
+            followModel(rendModel)
         end
     end
 end
 
-local function unregisterMovingModel(model)
-    if not model then return end
-    local id = model.Name
-    if movingById[id] then
-        if movingById[id].labelConn then
-            pcall(function() movingById[id].labelConn:Disconnect() end)
-        end
-        movingById[id] = nil
-        print(("[Sync] Moving model unregistered: id=%s"):format(id))
+-- Registrar modelo em RenderedMovingAnimals
+local function registerRendered(model)
+    local displayName = getDisplayName(model)
+    if not displayName then return end
+    renderedByDisplay[displayName] = renderedByDisplay[displayName] or {}
+    table.insert(renderedByDisplay[displayName], model)
+    print("[Rendered] Registrado:", displayName)
+
+    if isSelectedDisplay(displayName) and movingByDisplay[displayName] then
+        followModel(model)
     end
 end
 
--- rotinas para gerenciar renderedById (quando modelos aparecem em RenderedMovingAnimals)
-local function registerRenderedModel(rendModel)
-    if not rendModel or not rendModel:IsA("Model") then return end
-    local id = rendModel.Name
-    renderedById[id] = renderedById[id] or {}
-    renderedById[id].model = rendModel
-    print(("[Sync] Rendered model registered: id=%s"):format(id))
+-- Conexões
+movingFolder.ChildAdded:Connect(registerMoving)
+renderedFolder.ChildAdded:Connect(registerRendered)
 
-    -- se já tivermos moving entry e displayName selecionado, começar a seguir
-    local movingEntry = movingById[id]
-    local displayName = movingEntry and movingEntry.displayName
-    if displayName and isSelectedDisplay(displayName) then
-        startFollowRenderedModel(rendModel)
-    end
-
-    -- também escutar DescendantAdded para detectar prompts que apareçam depois
-    if renderedById[id].descConn then
-        pcall(function() renderedById[id].descConn:Disconnect() end)
-    end
-    renderedById[id].descConn = rendModel.DescendantAdded:Connect(function(desc)
-        if desc:IsA("ProximityPrompt") then
-            print(("[Sync] ProximityPrompt criado em Rendered model %s"):format(id))
-            -- caso já esteja seguindo, PPS.PromptShown cuidará de acionar o fire; mas podemos tentar disparar também aqui
-            -- (a lógica central usa PromptShown do serviço para garantir que o prompt está "mostrado" no client)
-        end
-    end)
-
-    -- limpar quando removido
-    if renderedById[id].remConn then
-        pcall(function() renderedById[id].remConn:Disconnect() end)
-    end
-    renderedById[id].remConn = rendModel.AncestryChanged:Connect(function(child, parent)
-        if not parent then
-            -- removido
-            if renderedById[id].following then
-                pcall(function() renderedById[id].following:Disconnect() end)
-                renderedById[id].following = nil
-            end
-            if renderedById[id].descConn then
-                pcall(function() renderedById[id].descConn:Disconnect() end)
-                renderedById[id].descConn = nil
-            end
-            renderedById[id].model = nil
-            -- deixamos a entry para possivelmente reusar caso re-spawn
-            print(("[Sync] Rendered model removed: id=%s"):format(id))
-        end
-    end)
-end
-
-local function unregisterRenderedModel(rendModel)
-    if not rendModel then return end
-    local id = rendModel.Name
-    if renderedById[id] then
-        if renderedById[id].following then
-            pcall(function() renderedById[id].following:Disconnect() end)
-        end
-        if renderedById[id].descConn then
-            pcall(function() renderedById[id].descConn:Disconnect() end)
-        end
-        if renderedById[id].remConn then
-            pcall(function() renderedById[id].remConn:Disconnect() end)
-        end
-        renderedById[id] = nil
-        print(("[Sync] Rendered model unregistered: id=%s"):format(id))
-    end
-end
-
--- Monitores iniciais para as duas pastas
-for _,m in ipairs(movingFolder:GetChildren()) do
-    if m:IsA("Model") then registerMovingModel(m) end
-end
-movingFolder.ChildAdded:Connect(registerMovingModel)
-movingFolder.ChildRemoved:Connect(unregisterMovingModel)
-
-for _,r in ipairs(renderedFolder:GetChildren()) do
-    if r:IsA("Model") then registerRenderedModel(r) end
-end
-renderedFolder.ChildAdded:Connect(registerRenderedModel)
-renderedFolder.ChildRemoved:Connect(unregisterRenderedModel)
-
--- GUI simples no CoreGui para ativar categorias
+-- GUI simples
 do
-    local screen = Instance.new("ScreenGui")
-    screen.Name = "SyncSelectorUI"
-    screen.IgnoreGuiInset = true
-    screen.ResetOnSpawn = false
-    screen.Parent = CoreGui
-
+    local screen = Instance.new("ScreenGui", CoreGui)
+    screen.Name = "DisplaySelectUI"
     local frame = Instance.new("Frame", screen)
-    frame.Size = UDim2.new(0,220,0,140)
+    frame.Size = UDim2.new(0,200,0,120)
     frame.Position = UDim2.new(0,10,0,60)
-    frame.BackgroundColor3 = Color3.fromRGB(28,28,28)
-    frame.BorderSizePixel = 0
+    frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
 
-    local title = Instance.new("TextLabel", frame)
-    title.Size = UDim2.new(1,0,0,28)
-    title.BackgroundTransparency = 1
-    title.Text = "Select Categories"
-    title.TextColor3 = Color3.new(1,1,1)
-    title.Font = Enum.Font.SourceSansBold
-    title.TextSize = 18
-
-    local function makeToggle(name, y)
+    local function makeBtn(name, y)
         local btn = Instance.new("TextButton", frame)
-        btn.Size = UDim2.new(1, -20, 0, 30)
-        btn.Position = UDim2.new(0,10,0,y)
+        btn.Size = UDim2.new(1,-10,0,30)
+        btn.Position = UDim2.new(0,5,0,y)
         btn.Text = name.." [OFF]"
-        btn.Font = Enum.Font.SourceSans
-        btn.TextSize = 14
         btn.BackgroundColor3 = Color3.fromRGB(150,30,30)
         btn.TextColor3 = Color3.new(1,1,1)
         btn.MouseButton1Click:Connect(function()
@@ -388,9 +174,9 @@ do
         end)
     end
 
-    makeToggle("Secrets", 36)
-    makeToggle("BrainrotGods", 74)
-    makeToggle("Test", 112)
+    makeBtn("Secrets", 10)
+    makeBtn("BrainrotGods", 45)
+    makeBtn("Test", 80)
 end
 
-print("[Sync] Monitor inicial pronto. Observando MovingAnimals and RenderedMovingAnimals.")
+print("[Script] Pronto para monitorar por DisplayName.")
