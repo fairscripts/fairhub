@@ -1,4 +1,15 @@
--- UI + seguir modelo + tentativa robusta de interação com ProximityPrompt (hold = 5s)
+-- Detectar função de interação disponível
+local firePrompt
+if typeof(fireproximityprompt) == "function" then
+    firePrompt = fireproximityprompt
+elseif typeof(fireProximityPrompt) == "function" then
+    firePrompt = fireProximityPrompt
+else
+    firePrompt = nil
+    warn("[Detector] Nenhuma função fireproximityprompt encontrada no executor — usando apenas métodos de simulação.")
+end
+
+-- Serviços
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
@@ -7,17 +18,14 @@ local PPS = game:GetService("ProximityPromptService")
 
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-
--- tentar pegar VirtualInputManager (nem sempre disponível)
 local VIM
 pcall(function() VIM = game:GetService("VirtualInputManager") end)
-
 local camera = workspace.CurrentCamera
 
--- pasta alvo
+-- Pasta alvo
 local alvo = Workspace:WaitForChild("RenderedMovingAnimals")
 
--- listas (use suas listas)
+-- Listas
 local groups = {
     Secrets = {
         "La Vacca Saturno Saturnita","Chimpanzini Spiderini","Agarrini la Palini",
@@ -44,7 +52,7 @@ end
 
 local state = { Secrets = false, BrainrotGods = false, Test = false }
 
--- UI simples (garante PlayerGui)
+-- Criar UI
 local function createGui()
     local gui = Instance.new("ScreenGui")
     gui.Name = "DetectorUI_"..tostring(math.random(1000,9999))
@@ -63,9 +71,12 @@ frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
 frame.BorderSizePixel = 0
 
 local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1,0,0,34); title.BackgroundTransparency = 1
-title.Font = Enum.Font.GothamBold; title.Text = "RNG Detector"
-title.TextColor3 = Color3.fromRGB(255,255,255); title.TextSize = 18
+title.Size = UDim2.new(1,0,0,34)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.Text = "RNG Detector"
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.TextSize = 18
 
 local function makeToggle(text, y, key)
     local b = Instance.new("TextButton", frame)
@@ -73,14 +84,17 @@ local function makeToggle(text, y, key)
     b.Position = UDim2.new(0, 10, 0, 34 + y)
     b.BackgroundColor3 = Color3.fromRGB(170,0,0)
     b.TextColor3 = Color3.fromRGB(255,255,255)
-    b.Font = Enum.Font.GothamBold; b.TextSize = 15
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 15
     b.Text = text.." : OFF"
     b.MouseButton1Click:Connect(function()
         state[key] = not state[key]
         if state[key] then
-            b.BackgroundColor3 = Color3.fromRGB(0,170,0); b.Text = text.." : ON"
+            b.BackgroundColor3 = Color3.fromRGB(0,170,0)
+            b.Text = text.." : ON"
         else
-            b.BackgroundColor3 = Color3.fromRGB(170,0,0); b.Text = text.." : OFF"
+            b.BackgroundColor3 = Color3.fromRGB(170,0,0)
+            b.Text = text.." : OFF"
         end
     end)
 end
@@ -91,12 +105,15 @@ makeToggle("Test", 86, "Test")
 
 local function notify(msg)
     pcall(function()
-        StarterGui:SetCore("SendNotification", {Title = "Detector", Text = msg, Duration = 4})
+        StarterGui:SetCore("SendNotification", {
+            Title = "Detector",
+            Text = msg,
+            Duration = 4
+        })
     end)
     print("[Detector] "..msg)
 end
 
--- util: posição mundial do prompt (Attachment -> BasePart -> Model.PrimaryPart)
 local function getPromptWorldPosition(prompt)
     if not prompt or not prompt.Parent then return nil end
     local parent = prompt.Parent
@@ -113,65 +130,108 @@ local function getPromptWorldPosition(prompt)
     return nil
 end
 
--- função que tenta interagir com retry; holdDuration definido para 5s
 local function tryInteractPrompt(prompt, holdDuration)
-    holdDuration = holdDuration or 5 -- <-- segurando 5 segundos
-    if not prompt then return false end
+    holdDuration = holdDuration or 5
     print("[Detector] Tentando interagir com prompt:", tostring(prompt))
     local success = false
     local triggeredConn
     pcall(function()
         if prompt.Triggered then
-            triggeredConn = prompt.Triggered:Connect(function(...)
+            triggeredConn = prompt.Triggered:Connect(function()
                 success = true
                 print("[Detector] Prompt.Triggered local fired.")
             end)
         end
     end)
 
-    -- 1) Tentar fireproximityprompt com hold longo (uma vez pode bastar)
-    pcall(function()
-        prompt.Enabled = true
-    end)
-    pcall(function()
-        -- chama uma vez com holdDuration grande
-        fireproximityprompt(prompt, holdDuration)
-    end)
-    -- aguardar até holdDuration + um buffer para ver se Triggered ocorreu
-    local waitUntil = tick() + holdDuration + 0.6
-    while tick() < waitUntil do
-        if success then break end
-        task.wait(0.08)
-    end
-
-    -- 2) se não teve sucesso, tentar repetir fire algumas vezes mais (curtos)
-    if not success then
-        for i=1,3 do
-            pcall(function() fireproximityprompt(prompt, math.min(holdDuration,2)) end)
-            local deadline = tick() + 0.4
-            while tick() < deadline do
-                if success then break end
-                task.wait(0.05)
-            end
+    -- 1) fireproximityprompt (se disponível)
+    if firePrompt then
+        pcall(function() prompt.Enabled = true end)
+        pcall(function() firePrompt(prompt, holdDuration) end)
+        local deadline = tick() + holdDuration + 0.5
+        while tick() < deadline do
             if success then break end
+            task.wait(0.05)
         end
+    else
+        warn("[Detector] fireproximityprompt indisponível — pulando para fallback.")
     end
 
-    -- 3) fallback: simular tecla E via VIM (se disponível)
+    -- 2) Fallback VirtualInputManager
     if not success and VIM then
-        print("[Detector] fireproximityprompt não funcionou — tentando VirtualInputManager (E).")
+        print("[Detector] Tentando VirtualInputManager (E).")
         pcall(function() VIM:SendKeyEvent(true, Enum.KeyCode.E, false, game) end)
         task.wait(0.12)
         pcall(function() VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
-        local deadline = tick() + 0.6
+        local deadline = tick() + 0.5
         while tick() < deadline do
             if success then break end
             task.wait(0.05)
         end
     end
 
-    -- 4) fallback: clicar na tela na posição do prompt (se VIM + camera disponíveis)
+    -- 3) Fallback clique na tela
     if not success and VIM and camera then
         local worldPos = getPromptWorldPosition(prompt)
         if worldPos then
             local sx, sy, onScreen = camera:WorldToViewportPoint(worldPos)
+            if onScreen then
+                print("[Detector] Tentando clique na tela em:", sx, sy)
+                pcall(function() VIM:SendMouseButtonEvent(sx, sy, true, game) end)
+                task.wait(0.06)
+                pcall(function() VIM:SendMouseButtonEvent(sx, sy, false, game) end)
+            end
+        end
+    end
+
+    if triggeredConn then pcall(function() triggeredConn:Disconnect() end) end
+    print("[Detector] Resultado da interação:", success and "SUCESSO" or "FALHOU")
+    return success
+end
+
+local function seguirModelo(obj)
+    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        if not obj or not obj.Parent then
+            conn:Disconnect()
+            return
+        end
+        local targetPart
+        if obj:IsA("Model") and obj.PrimaryPart then
+            targetPart = obj.PrimaryPart
+        elseif obj:IsA("BasePart") then
+            targetPart = obj
+        else
+            targetPart = obj:FindFirstChildWhichIsA("BasePart", true)
+        end
+        if targetPart then
+            humanoid:MoveTo(targetPart.Position)
+        end
+    end)
+end
+
+PPS.PromptShown:Connect(function(prompt)
+    if prompt and prompt:IsDescendantOf(alvo) then
+        task.spawn(function()
+            task.wait(0.08)
+            tryInteractPrompt(prompt, 5)
+        end)
+    end
+end)
+
+alvo.ChildAdded:Connect(function(obj)
+    local g = nameToGroup[obj.Name]
+    if g and state[g] then
+        notify("["..g.."] "..obj.Name)
+        seguirModelo(obj)
+        task.defer(function()
+            for _,desc in ipairs(obj:GetDescendants()) do
+                if desc:IsA("ProximityPrompt") then
+                    tryInteractPrompt(desc, 5)
+                end
+            end
+        end)
+    end
+end)
