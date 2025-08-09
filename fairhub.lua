@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
@@ -127,15 +128,45 @@ local function notify(msg)
     task.delay(4, function() if label then label:Destroy() end end)
 end
 
--- Função para acionar todos os ProximityPrompts
-local function acionarPrompts(obj)
-    for _, descendant in ipairs(obj:GetDescendants()) do
-        if descendant:IsA("ProximityPrompt") then
-            pcall(function()
-                fireproximityprompt(descendant)
-            end)
+-- Função para seguir e interagir
+local function seguirEInteragir(obj)
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    local promptAtivado = false
+
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        if not obj or not obj.Parent then
+            conn:Disconnect()
+            return
         end
-    end
+
+        local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
+
+        local targetPart
+        if obj:IsA("Model") and obj.PrimaryPart then
+            targetPart = obj.PrimaryPart
+        elseif obj:IsA("BasePart") then
+            targetPart = obj
+        else
+            targetPart = obj:FindFirstChildWhichIsA("BasePart", true)
+        end
+
+        if targetPart then
+            humanoid:MoveTo(targetPart.Position)
+            if prompt and (LocalPlayer:DistanceFromCharacter(targetPart.Position) <= (prompt.MaxActivationDistance or 10)) then
+                if not promptAtivado then
+                    pcall(function()
+                        fireproximityprompt(prompt)
+                        promptAtivado = true
+                    end)
+                    conn:Disconnect()
+                end
+            end
+        end
+    end)
 end
 
 -- Monitorar apenas RenderedMovingAnimals
@@ -144,6 +175,6 @@ alvo.ChildAdded:Connect(function(obj)
     if g and state[g] then
         notify("["..g.."] "..obj.Name)
         print("Detectado:", "Workspace.RenderedMovingAnimals."..obj.Name)
-        acionarPrompts(obj) -- aciona prompts automaticamente
+        seguirEInteragir(obj)
     end
 end)
