@@ -132,16 +132,19 @@ end
 
 local function tryInteractPrompt(prompt, holdDuration)
     holdDuration = holdDuration or 5
-    print("[Detector] Tentando interagir com prompt:", tostring(prompt))
+    if not prompt or not prompt:IsA("ProximityPrompt") then
+        warn("[Detector] Objeto passado não é um ProximityPrompt válido.")
+        return false
+    end
+
+    print("[Detector] Tentando interagir com prompt:", prompt:GetFullName())
     local success = false
     local triggeredConn
     pcall(function()
-        if prompt.Triggered then
-            triggeredConn = prompt.Triggered:Connect(function()
-                success = true
-                print("[Detector] Prompt.Triggered local fired.")
-            end)
-        end
+        triggeredConn = prompt.Triggered:Connect(function()
+            success = true
+            print("[Detector] Prompt.Triggered local fired.")
+        end)
     end)
 
     -- 1) fireproximityprompt (se disponível)
