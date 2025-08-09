@@ -27,6 +27,16 @@ local function moverAte(pos)
     end
 end
 
+-- Função para buscar prompt recursivamente
+local function acharPrompt(base)
+    for _,obj in ipairs(base:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            return obj
+        end
+    end
+    return nil
+end
+
 -- Função para tentar interagir com o prompt
 local function interagirPrompt(prompt)
     if not prompt or not prompt:IsA("ProximityPrompt") then
@@ -63,25 +73,34 @@ end
 
 -- Detectar novos modelos e interagir
 alvo.ChildAdded:Connect(function(model)
-    task.wait(0.2) -- esperar carregar partes
-
     if model:IsA("Model") then
-        local prompt = nil
+        task.spawn(function()
+            local prompt = nil
+            local start = tick()
 
-        local rootPart = model:FindFirstChild("RootPart")
-        local fakeRoot = model:FindFirstChild("FakeRootPart")
+            -- Tentar achar o prompt por até 2 segundos
+            while tick() - start < 2 and not prompt do
+                local rootPart = model:FindFirstChild("RootPart")
+                local fakeRoot = model:FindFirstChild("FakeRootPart")
 
-        if rootPart then
-            prompt = rootPart:FindFirstChildOfClass("ProximityPrompt")
-        end
-        if not prompt and fakeRoot then
-            prompt = fakeRoot:FindFirstChildOfClass("ProximityPrompt")
-        end
+                if rootPart then
+                    prompt = acharPrompt(rootPart)
+                end
+                if not prompt and fakeRoot then
+                    prompt = acharPrompt(fakeRoot)
+                end
 
-        if prompt then
-            interagirPrompt(prompt)
-        else
-            print("[Info] Nenhum ProximityPrompt encontrado em", model.Name)
-        end
+                if not prompt then
+                    task.wait(0.1)
+                end
+            end
+
+            if prompt then
+                print("[Info] Prompt encontrado em", model.Name)
+                interagirPrompt(prompt)
+            else
+                print("[Info] Nenhum ProximityPrompt encontrado em", model.Name)
+            end
+        end)
     end
 end)
