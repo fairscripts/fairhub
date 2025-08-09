@@ -15,7 +15,7 @@ local function acharPrompt(model)
     return nil
 end
 
--- Função para seguir e interagir com o modelo
+-- Função para seguir e interagir até o modelo sumir
 local function seguirEInteragir(model)
     local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
     if not humanoid then return end
@@ -25,8 +25,10 @@ local function seguirEInteragir(model)
 
     local connection
     connection = RunService.Heartbeat:Connect(function()
+        -- Parar se o modelo foi destruído ou removido
         if not model or not model.Parent then
             connection:Disconnect()
+            print("[Parando] Modelo destruído ou removido:", model and model.Name or "nil")
             return
         end
 
@@ -42,7 +44,7 @@ local function seguirEInteragir(model)
             humanoid:MoveTo(targetPos)
         end
 
-        -- Procurar prompt
+        -- Procurar e interagir com ProximityPrompt
         local prompt = acharPrompt(model)
         if prompt then
             if firePrompt then
@@ -53,7 +55,6 @@ local function seguirEInteragir(model)
                 task.wait(2)
                 VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
             end
-            connection:Disconnect()
         end
     end)
 end
