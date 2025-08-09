@@ -1,4 +1,4 @@
--- UI + seguir modelo + tentativa robusta de interação com ProximityPrompt
+-- UI + seguir modelo + tentativa robusta de interação com ProximityPrompt (hold = 5s)
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
@@ -8,7 +8,7 @@ local PPS = game:GetService("ProximityPromptService")
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- try get VirtualInputManager (nem sempre disponível)
+-- tentar pegar VirtualInputManager (nem sempre disponível)
 local VIM
 pcall(function() VIM = game:GetService("VirtualInputManager") end)
 
@@ -96,7 +96,7 @@ local function notify(msg)
     print("[Detector] "..msg)
 end
 
--- util: posição "mundo" do prompt (tenta Attachment -> BasePart -> Model.PrimaryPart)
+-- util: posição mundial do prompt (Attachment -> BasePart -> Model.PrimaryPart)
 local function getPromptWorldPosition(prompt)
     if not prompt or not prompt.Parent then return nil end
     local parent = prompt.Parent
@@ -113,14 +113,13 @@ local function getPromptWorldPosition(prompt)
     return nil
 end
 
--- rotina robusta: tenta vários métodos até detectar Triggered
-local function tryInteractPrompt(prompt, timeout)
-    timeout = timeout or 3
+-- função que tenta interagir com retry; holdDuration definido para 5s
+local function tryInteractPrompt(prompt, holdDuration)
+    holdDuration = holdDuration or 5 -- <-- segurando 5 segundos
     if not prompt then return false end
-    print("[Detector] Tentando interagir com prompt:", prompt:GetFullName and prompt:GetFullName() or tostring(prompt))
+    print("[Detector] Tentando interagir com prompt:", tostring(prompt))
     local success = false
     local triggeredConn
-    -- tenta conectar Triggered local para detectar sucesso
     pcall(function()
         if prompt.Triggered then
             triggeredConn = prompt.Triggered:Connect(function(...)
@@ -129,32 +128,50 @@ local function tryInteractPrompt(prompt, timeout)
             end)
         end
     end)
-    local start = tick()
 
-    -- 1) tentar fireproximityprompt algumas vezes
-    for i=1,4 do
+    -- 1) Tentar fireproximityprompt com hold longo (uma vez pode bastar)
+    pcall(function()
+        prompt.Enabled = true
+    end)
+    pcall(function()
+        -- chama uma vez com holdDuration grande
+        fireproximityprompt(prompt, holdDuration)
+    end)
+    -- aguardar até holdDuration + um buffer para ver se Triggered ocorreu
+    local waitUntil = tick() + holdDuration + 0.6
+    while tick() < waitUntil do
         if success then break end
-        pcall(function() fireproximityprompt(prompt, 1) end)
-        task.wait(0.18)
-        if success then break end
+        task.wait(0.08)
     end
 
-    -- 2) se não funcionou, tentar VirtualInputManager tecla E
+    -- 2) se não teve sucesso, tentar repetir fire algumas vezes mais (curtos)
+    if not success then
+        for i=1,3 do
+            pcall(function() fireproximityprompt(prompt, math.min(holdDuration,2)) end)
+            local deadline = tick() + 0.4
+            while tick() < deadline do
+                if success then break end
+                task.wait(0.05)
+            end
+            if success then break end
+        end
+    end
+
+    -- 3) fallback: simular tecla E via VIM (se disponível)
     if not success and VIM then
         print("[Detector] fireproximityprompt não funcionou — tentando VirtualInputManager (E).")
-        pcall(function()
-            VIM:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-        end)
+        pcall(function() VIM:SendKeyEvent(true, Enum.KeyCode.E, false, game) end)
         task.wait(0.12)
-        pcall(function()
-            VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-        end)
-        -- aguarda um pouco por Triggered
-        local waitUntil = tick() + 0.4
-        while tick() < waitUntil do
+        pcall(function() VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
+        local deadline = tick() + 0.6
+        while tick() < deadline do
             if success then break end
             task.wait(0.05)
         end
     end
 
-    -- 3) se ainda não, tentar clique
+    -- 4) fallback: clicar na tela na posição do prompt (se VIM + camera disponíveis)
+    if not success and VIM and camera then
+        local worldPos = getPromptWorldPosition(prompt)
+        if worldPos then
+            local sx, sy, onScreen = camera:WorldToViewportPoint(worldPos)
