@@ -1,4 +1,4 @@
--- Seguir modelo até ele sumir + interagir quando DisplayName == "Tung Tung Tung Sahur"
+-- Seguir modelo até ele sumir + interagir quando DisplayName == "Tung Tung Tung Sahur" (com cooldown de 2s)
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
@@ -31,7 +31,6 @@ local function safeFirePrompt(prompt, holdTime)
         if ok then return true end
         warn("[safeFirePrompt] firePrompt pcall failed:", err)
     end
-    -- fallback: tentar VirtualInputManager (pode não existir)
     local ok, vim = pcall(function() return game:GetService("VirtualInputManager") end)
     if ok and vim then
         pcall(function() vim:SendKeyEvent(true, Enum.KeyCode.E, false, game) end)
@@ -52,23 +51,21 @@ local function acharPrompt(model)
     return nil
 end
 
--- encontra a melhor BasePart para seguir (HumanoidRootPart, RootPart, PrimaryPart, qualquer BasePart)
+-- encontra a melhor BasePart para seguir
 local function acharParteAlvo(model)
     if not model then return nil end
     local try = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("RootPart") or model.PrimaryPart
     if try and try:IsA("BasePart") then return try end
-    -- fallback: qualquer BasePart
     for _,v in ipairs(model:GetDescendants()) do
         if v:IsA("BasePart") then return v end
     end
     return nil
 end
 
--- função principal: seguir e interagir enquanto o modelo existir
+-- função principal: seguir e interagir enquanto o modelo existir (com cooldown)
 local function seguirEInteragirAteSumir(model)
     if not model or not model.Parent then return end
 
-    -- aguarda o character/humanoid prontos (timeout curto)
     local char, humanoid, hrp = waitForCharacterParts(5)
     if not char or not humanoid or not hrp then
         warn("[seguirEInteragir] Character/Humanoid/HRP não prontos. Abortando.")
@@ -79,49 +76,34 @@ local function seguirEInteragirAteSumir(model)
     print(("[seguirEInteragir] Iniciando follow em modelo %s"):format(modelName))
 
     local lastPrint = 0
+    local lastFireTime = 0 -- cooldown individual para esse modelo
     local connection
-    connection = RunService.Heartbeat:Connect(function(dt)
-        -- se modelo acabou, desconecta e sai
+    connection = RunService.Heartbeat:Connect(function()
         if not model or not model.Parent then
             connection:Disconnect()
             print(("[seguirEInteragir] Modelo %s removido — parando follow."):format(modelName))
             return
         end
 
-        -- achar parte alvo
         local targetPart = acharParteAlvo(model)
         if targetPart then
             local targetPos = targetPart.Position
-            -- MoveTo só se estivermos longe o suficiente (reduz spam)
             local dist = (hrp.Position - targetPos).Magnitude
             if dist > 2.2 then
-                -- atualizar movimento constantemente
                 local ok, err = pcall(function() humanoid:MoveTo(targetPos) end)
-                if not ok then
-                    -- às vezes MoveTo pode falhar; logamos uma vez a cada 3s
-                    if tick() - lastPrint > 3 then
-                        warn("[seguirEInteragir] humanoid:MoveTo falhou:", err)
-                        lastPrint = tick()
-                    end
+                if not ok and tick() - lastPrint > 3 then
+                    warn("[seguirEInteragir] humanoid:MoveTo falhou:", err)
+                    lastPrint = tick()
                 end
             end
-
-            -- log leve de distância (apenas a cada ~2s)
             if tick() - lastPrint > 2 then
                 print(("[seguirEInteragir] %s → dist = %.2f"):format(modelName, dist))
                 lastPrint = tick()
             end
-        else
-            if tick() - lastPrint > 3 then
-                warn(("[seguirEInteragir] Nenhuma BasePart encontrada em %s (aguardando...)"):format(modelName))
-                lastPrint = tick()
-            end
         end
 
-        -- procurar prompt no modelo e tentar interagir se achar
         local prompt = acharPrompt(model)
         if prompt then
-            -- opcional: checar distância ao prompt antes de interagir (se parent for BasePart)
             local pparent = prompt.Parent
             local promptPos = nil
             if pparent and pparent:IsA("BasePart") then
@@ -133,13 +115,12 @@ local function seguirEInteragirAteSumir(model)
             local canTry = true
             if promptPos and hrp then
                 local d = (hrp.Position - promptPos).Magnitude
-                -- se muito longe, não tentar (a menos que queira)
                 if d > (prompt.MaxActivationDistance + 6) then
                     canTry = false
                 end
             end
 
-            if canTry then
+            if canTry and (tick() - lastFireTime >= 2) then -- cooldown de 2 segundos
                 print(("[seguirEInteragir] Prompt encontrado em %s — tentando interagir"):format(modelName))
                 local ok = safeFirePrompt(prompt, 2)
                 if ok then
@@ -147,36 +128,30 @@ local function seguirEInteragirAteSumir(model)
                 else
                     warn(("[seguirEInteragir] Falha ao interagir com prompt em %s"):format(modelName))
                 end
-                -- após tentar, NÃO desconectamos imediatamente — mantemos seguindo até destruição, como pediu
+                lastFireTime = tick()
             end
         end
     end)
 end
 
--- monitor: quando modelo novo for adicionado em MovingAnimals, checar DisplayName TextLabel
+-- monitor: quando modelo novo for adicionado em MovingAnimals, checar DisplayName
 local movingAnimals = Workspace:WaitForChild("MovingAnimals")
 movingAnimals.ChildAdded:Connect(function(model)
     if not model or not model:IsA("Model") then return end
-    -- pequena espera para hierarquia replicar
     task.wait(0.15)
 
     local infoFolder = model:FindFirstChild("HumanoidRootPart") and model.HumanoidRootPart:FindFirstChild("Info")
     if not infoFolder then
-        -- tentar aguardar por até 0.5s caso venha um pouco depois
         task.wait(0.3)
         infoFolder = model:FindFirstChild("HumanoidRootPart") and model.HumanoidRootPart:FindFirstChild("Info")
     end
-    if not infoFolder then
-        -- sem Info — nada a fazer aqui
-        return
-    end
+    if not infoFolder then return end
 
-    local displayLabel = infoFolder:FindFirstChild("DisplayName", true) -- busca recursiva
+    local displayLabel = infoFolder:FindFirstChild("DisplayName", true)
     if displayLabel and displayLabel:IsA("TextLabel") then
         local txt = displayLabel.Text or ""
         print(("[Monitor] Modelo %s chegou — DisplayName = %q"):format(model.Name, txt))
         if txt == "Tung Tung Tung Sahur" then
-            -- start follow (não bloqueante)
             task.spawn(function()
                 seguirEInteragirAteSumir(model)
             end)
@@ -184,4 +159,4 @@ movingAnimals.ChildAdded:Connect(function(model)
     end
 end)
 
-print("[Script] Monitor inicial pronto.")
+print("[Script] Monitor inicial pronto (com cooldown de 2s para interação).")
