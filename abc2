@@ -62,7 +62,7 @@ local function acharParteAlvo(model)
     return nil
 end
 
--- função principal: seguir e interagir enquanto o modelo existir (com cooldown e limite de tentativas)
+-- função principal: seguir e interagir enquanto o modelo existir (cooldown + limite de tentativas quando < 10 studs)
 local function seguirEInteragirAteSumir(model)
     if not model or not model.Parent then return end
 
@@ -76,8 +76,8 @@ local function seguirEInteragirAteSumir(model)
     print(("[seguirEInteragir] Iniciando follow em modelo %s"):format(modelName))
 
     local lastPrint = 0
-    local lastFireTime = 0 -- cooldown individual para esse modelo
-    local tentativas = 0    -- contador de tentativas para esse modelo
+    local lastFireTime = 0
+    local tentativas = 0
     local connection
     connection = RunService.Heartbeat:Connect(function()
         if not model or not model.Parent then
@@ -104,26 +104,47 @@ local function seguirEInteragirAteSumir(model)
 
         local prompt = acharPrompt(model)
         if prompt then
-            if tentativas >= 5 then
-                print(("[seguirEInteragir] Limite de 5 tentativas atingido para %s — parando follow."):format(modelName))
-                connection:Disconnect()
-                return
+            local pparent = prompt.Parent
+            local promptPos = nil
+            if pparent and pparent:IsA("BasePart") then
+                promptPos = pparent.Position
+            elseif pparent and pparent:IsA("Attachment") and pparent.Parent and pparent.Parent:IsA("BasePart") then
+                promptPos = (pparent.Parent.CFrame * CFrame.new(pparent.Position)).p
             end
 
-            if tick() - lastFireTime >= 2 then -- cooldown de 2 segundos
-                print(("[seguirEInteragir] Prompt encontrado em %s — tentando interagir (tentativa %d/5)"):format(modelName, tentativas + 1))
-                local ok = safeFirePrompt(prompt, 2)
-                if ok then
-                    print(("[seguirEInteragir] Interação disparada para %s"):format(modelName))
-                else
-                    warn(("[seguirEInteragir] Falha ao interagir com prompt em %s"):format(modelName))
+            local canTry = true
+            local distPrompt = math.huge
+            if promptPos and hrp then
+                distPrompt = (hrp.Position - promptPos).Magnitude
+                if distPrompt > (prompt.MaxActivationDistance + 6) then
+                    canTry = false
                 end
-                tentativas = tentativas + 1
-                lastFireTime = tick()
+            end
+
+            -- só começa a contar tentativas se estiver a menos de 10 studs do prompt
+            if canTry and distPrompt <= 10 then
+                if tentativas >= 5 then
+                    print(("[seguirEInteragir] Limite de 5 tentativas atingido para %s — parando follow."):format(modelName))
+                    connection:Disconnect()
+                    return
+                end
+
+                if tick() - lastFireTime >= 2 then
+                    print(("[seguirEInteragir] Prompt encontrado em %s — tentando interagir (tentativa %d/5)"):format(modelName, tentativas + 1))
+                    local ok = safeFirePrompt(prompt, 2)
+                    if ok then
+                        print(("[seguirEInteragir] Interação disparada para %s"):format(modelName))
+                    else
+                        warn(("[seguirEInteragir] Falha ao interagir com prompt em %s"):format(modelName))
+                    end
+                    tentativas = tentativas + 1
+                    lastFireTime = tick()
+                end
             end
         end
     end)
 end
+
 
 
 -- monitor: quando modelo novo for adicionado em MovingAnimals, checar DisplayName
