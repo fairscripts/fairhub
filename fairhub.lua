@@ -1,177 +1,177 @@
--- Serviços
+-- Logger para testar ProximityPrompts em Workspace.RenderedMovingAnimals
 local Players = game:GetService("Players")
-local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
+local PPS = game:GetService("ProximityPromptService")
+local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Pasta alvo
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+
+-- pasta alvo
 local alvo = Workspace:WaitForChild("RenderedMovingAnimals")
 
--- Listas de RNGs
-local groups = {
-    Secrets = {
-        "La Vacca Saturno Saturnita","Chimpanzini Spiderini","Agarrini la Palini",
-        "Los Tralaleritos","Las Tralaleritas","Las Vaquitas Saturnitas",
-        "Graipuss Medussi","Chicleteira Bicicleteira","La Grande Combinasion",
-        "Los Combinasionas","Nuclearo Dinossauro","Garama and Madundung",
-        "Dragon Cannelloni","Secret Lucky Block","Pot Hotspot"
-    },
-    BrainrotGods = {
-        "Cocofanto Elefanto","Girafa Celestre","Gattatino Neonino","Matteo",
-        "Tralalero Tralala","Los Crocodillitos","Espresso Signora",
-        "Odin Din Din Dun","Statutino Libertino","Tukanno Bananno",
-        "Trenostruzzo Turbo 3000","Trippi Troppi Troppa Trippa","Ballerino Lololo",
-        "Los Tungtungtungcitos","Piccione Macchina","Brainrot God Lucky Block",
-        "Orcalero Orcala"
-    },
-    Test = {
-        "Tung Tung Tung Sahur"
-    }
-}
+-- util: monta o caminho completo do objeto
+local function getPath(obj)
+    if not obj then return "nil" end
+    local parts = {}
+    local cur = obj
+    while cur and cur ~= game do
+        table.insert(parts, 1, cur.Name)
+        cur = cur.Parent
+    end
+    return table.concat(parts, ".")
+end
 
--- Lookup rápido
-local nameToGroup = {}
-for g, list in pairs(groups) do
-    for _, n in ipairs(list) do
-        nameToGroup[n] = g
+-- util: print formatado (timestamp + caminho + detalhes)
+local function log(fmt, ...)
+    local ts = os.date("%H:%M:%S")
+    local args = {...}
+    for i=1,#args do
+        if typeof(args[i]) == "Instance" then
+            args[i] = getPath(args[i])
+        else
+            args[i] = tostring(args[i])
+        end
+    end
+    print(string.format("[%s] %s", ts, string.format(fmt, unpack(args))))
+end
+
+-- tabela pra guardar prompts que já estamos monitorando
+local monitored = {}
+
+local function attachPrompt(prompt)
+    if not prompt or monitored[prompt] then return end
+    monitored[prompt] = true
+    pcall(function()
+        prompt.PromptShown:Connect(function(inputType)
+            log("PromptShown -> %s (inputType=%s)", prompt, tostring(inputType))
+        end)
+    end)
+    pcall(function()
+        prompt.PromptHidden:Connect(function(inputType)
+            log("PromptHidden -> %s (inputType=%s)", prompt, tostring(inputType))
+        end)
+    end)
+    -- alguns jogos/versões expõem Triggered no client; tentamos ligar também
+    pcall(function()
+        prompt.Triggered:Connect(function(...)
+            local args = {...}
+            if #args == 0 then
+                log("Prompt.Triggered (no args) -> %s", prompt)
+            else
+                -- geralmente servidor passa player, client pode passar inputType
+                local s = ""
+                for i=1,#args do s = s .. tostring(args[i]) .. (i<#args and ", " or "") end
+                log("Prompt.Triggered -> %s (args=%s)", prompt, s)
+            end
+        end)
+    end)
+    log("Attached to prompt: %s", prompt)
+end
+
+-- Funções do serviço (global)
+pcall(function()
+    PPS.PromptShown:Connect(function(prompt, inputType)
+        log("Service.PromptShown -> %s (inputType=%s)", prompt, tostring(inputType))
+    end)
+end)
+pcall(function()
+    PPS.PromptHidden:Connect(function(prompt, inputType)
+        log("Service.PromptHidden -> %s (inputType=%s)", prompt, tostring(inputType))
+    end)
+end)
+pcall(function()
+    PPS.PromptTriggered:Connect(function(prompt, player)
+        log("Service.PromptTriggered -> %s (player=%s)", prompt, player and player.Name or "nil")
+    end)
+end)
+
+-- varre um ancestor (ex: model/pasta) em busca de ProximityPrompts e anexa listeners
+local function scanForPrompts(root)
+    for _, desc in ipairs(root:GetDescendants()) do
+        if desc:IsA("ProximityPrompt") then
+            attachPrompt(desc)
+        end
     end
 end
 
--- Estado dos botões
-local state = { Secrets = false, BrainrotGods = false, Test = false }
+-- inicial: escaneia tudo na pasta alvo
+log("Iniciando scan inicial em %s", getPath(alvo))
+scanForPrompts(alvo)
 
--- Criar container da UI
-local function createGuiContainer()
-    local ok, container
-    if type(gethui) == "function" then
-        ok, container = pcall(gethui)
-        if ok and typeof(container) == "Instance" then
-        else
-            container = nil
-        end
-    end
-    container = container or PlayerGui
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "DetectorUI_"..tostring(math.random(1000,9999))
-    gui.ResetOnSpawn = false
-    gui.IgnoreGuiInset = true
-    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.Parent = container
-    return gui
-end
-
-local gui = createGuiContainer()
-
--- Criar frame base
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 220, 0, 170)
-frame.Position = UDim2.new(0, 10, 0, 60)
-frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
-frame.BorderSizePixel = 0
-frame.BackgroundTransparency = 0.02
-
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1,0,0,34)
-title.BackgroundTransparency = 1
-title.Text = "RNG Detector"
-title.Font = Enum.Font.GothamBold
-title.TextSize = 18
-title.TextColor3 = Color3.fromRGB(255,255,255)
-
--- Criar botões
-local function makeToggle(text, y, key)
-    local b = Instance.new("TextButton", frame)
-    b.Size = UDim2.new(1, -20, 0, 36)
-    b.Position = UDim2.new(0, 10, 0, 34 + y)
-    b.BackgroundColor3 = Color3.fromRGB(170,0,0)
-    b.TextColor3 = Color3.fromRGB(255,255,255)
-    b.Font = Enum.Font.GothamBold
-    b.TextSize = 15
-    b.Text = text.." : OFF"
-    b.MouseButton1Click:Connect(function()
-        state[key] = not state[key]
-        if state[key] then
-            b.BackgroundColor3 = Color3.fromRGB(0,170,0)
-            b.Text = text.." : ON"
-        else
-            b.BackgroundColor3 = Color3.fromRGB(170,0,0)
-            b.Text = text.." : OFF"
-        end
-    end)
-end
-
-makeToggle("Secrets", 6, "Secrets")
-makeToggle("BrainrotGods", 46, "BrainrotGods")
-makeToggle("Test", 86, "Test")
-
--- Função de notificação
-local function notify(msg)
-    local success = pcall(function()
-        StarterGui:SetCore("SendNotification", {
-            Title = "Detector",
-            Text = msg,
-            Duration = 4
-        })
-    end)
-    if success then return end
-    local label = Instance.new("TextLabel", gui)
-    label.Size = UDim2.new(0.6,0,0,40)
-    label.Position = UDim2.new(0.2,0,0.02,0)
-    label.BackgroundColor3 = Color3.fromRGB(25,25,25)
-    label.TextColor3 = Color3.fromRGB(255,255,255)
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 16
-    label.Text = msg
-    label.BorderSizePixel = 0
-    task.delay(4, function() if label then label:Destroy() end end)
-end
-
--- Função para seguir e interagir sem depender da distância
-local function seguirEInteragir(obj)
-    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
-
-    local conn
-    conn = RunService.Heartbeat:Connect(function()
-        if not obj or not obj.Parent then
-            conn:Disconnect()
-            return
-        end
-
-        local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
-
-        local targetPart
-        if obj:IsA("Model") and obj.PrimaryPart then
-            targetPart = obj.PrimaryPart
-        elseif obj:IsA("BasePart") then
-            targetPart = obj
-        else
-            targetPart = obj:FindFirstChildWhichIsA("BasePart", true)
-        end
-
-        if targetPart then
-            humanoid:MoveTo(targetPart.Position)
-        end
-
-        if prompt then
-            prompt.Enabled = true
-            pcall(function()
-                fireproximityprompt(prompt, 1) -- segura por 1s
-            end)
-            conn:Disconnect()
-        end
-    end)
-end
-
--- Monitorar apenas RenderedMovingAnimals
-alvo.ChildAdded:Connect(function(obj)
-    local g = nameToGroup[obj.Name]
-    if g and state[g] then
-        notify("["..g.."] "..obj.Name)
-        print("Detectado:", "Workspace.RenderedMovingAnimals."..obj.Name)
-        seguirEInteragir(obj)
+-- quando novos objetos aparecem dentro da pasta alvo, escaneia-os
+alvo.DescendantAdded:Connect(function(desc)
+    if desc:IsA("ProximityPrompt") then
+        attachPrompt(desc)
+    elseif desc:IsA("Model") or desc:IsA("Folder") or desc:IsA("BasePart") then
+        -- se um modelo/subpasta foi adicionado, checa se contém prompts
+        -- delay pequeno para dar tempo de hierarquia terminar de montar
+        task.defer(function()
+            scanForPrompts(desc)
+        end)
     end
 end)
+
+-- Helper: encontra o prompt monitorado mais próximo do jogador (dentro de maxDist studs)
+local function findNearestPrompt(maxDist)
+    local char = LocalPlayer.Character
+    local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart)
+    if not hrp then return nil, math.huge end
+    local best, bestDist = nil, math.huge
+    for promptObj,_ in pairs(monitored) do
+        if promptObj and promptObj.Parent then
+            -- tenta achar posição do prompt via parent/basepart
+            local parent = promptObj.Parent
+            local pos = nil
+            if parent:IsA("BasePart") then
+                pos = parent.Position
+            elseif parent:IsA("Model") and parent.PrimaryPart then
+                pos = parent.PrimaryPart.Position
+            else
+                local bp = parent:FindFirstChildWhichIsA("BasePart", true)
+                if bp then pos = bp.Position end
+            end
+            if pos then
+                local d = (hrp.Position - pos).Magnitude
+                if d < bestDist then
+                    bestDist = d
+                    best = promptObj
+                end
+            end
+        end
+    end
+    if bestDist <= (maxDist or 10) then
+        return best, bestDist
+    else
+        return nil, bestDist
+    end
+end
+
+-- captura tecla E (PC) e tenta identificar qual prompt estava mais perto na hora
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.E then
+        local prompt, dist = findNearestPrompt(12) -- raio de 12 studs
+        if prompt then
+            log("Input E pressed -> nearest prompt: %s (dist=%.2f)", prompt, dist)
+        else
+            log("Input E pressed -> no prompt within range (closestDist=%.2f)", dist)
+        end
+    end
+    -- para mobile: registrar qualquer toque (útil se você tocar na própria UI do prompt)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        local prompt, dist = findNearestPrompt(12)
+        if prompt then
+            log("Touch input -> nearest prompt: %s (dist=%.2f)", prompt, dist)
+        else
+            log("Touch input -> no prompt within range (closestDist=%.2f)", dist)
+        end
+    end
+end)
+
+-- comando simples para listar todos prompts monitorados agora
+log("Atualmente monitorando prompts (count): %d", (function() local c=0; for _ in pairs(monitored) do c=c+1 end; return c end)())
+
+-- Sugestão para teste (imprima isto no console)
+log("TESTE: aproxime-se de um prompt na pasta RenderedMovingAnimals, espere 'PromptShown' e então pressione E / interaja. Observe as linhas do console.")
