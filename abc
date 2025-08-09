@@ -1,183 +1,187 @@
+-- Seguir modelo até ele sumir + interagir quando DisplayName == "Tung Tung Tung Sahur"
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
-local PPS = game:GetService("ProximityPromptService")
-local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
--- Detectar função de interação
+-- espera Character/Humanoid/HumanoidRootPart com timeout seguro
+local function waitForCharacterParts(timeout)
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local ok = pcall(function() char:WaitForChild("Humanoid", timeout) end)
+    local ok2 = pcall(function() char:WaitForChild("HumanoidRootPart", timeout) end)
+    return char, (ok and char:FindFirstChildOfClass("Humanoid")), (ok2 and char:FindFirstChild("HumanoidRootPart"))
+end
+
+-- detectar função de fireproximityprompt de forma segura
 local firePromptFn
 if typeof(fireproximityprompt) == "function" then
     firePromptFn = fireproximityprompt
 elseif typeof(fireProximityPrompt) == "function" then
     firePromptFn = fireProximityPrompt
 else
-    warn("[Script] Nenhuma função fireproximityprompt disponível")
+    firePromptFn = nil
 end
 
--- Listas case-sensitive
-local groups = {
-    Secrets = {
-        "La Vacca Saturno Saturnita","Chimpanzini Spiderini","Agarrini la Palini",
-        "Los Tralaleritos","Las Tralaleritas","Las Vaquitas Saturnitas",
-        "Graipuss Medussi","Chicleteira Bicicleteira","La Grande Combinasion",
-        "Los Combinasionas","Nuclearo Dinossauro","Garama and Madundung",
-        "Dragon Cannelloni","Secret Lucky Block","Pot Hotspot"
-    },
-    BrainrotGods = {
-        "Cocofanto Elefanto","Girafa Celestre","Gattatino Neonino","Matteo",
-        "Tralalero Tralala","Los Crocodillitos","Espresso Signora",
-        "Odin Din Din Dun","Statutino Libertino","Tukanno Bananno",
-        "Trenostruzzo Turbo 3000","Trippi Troppi Troppa Trippa","Ballerino Lololo",
-        "Los Tungtungtungcitos","Piccione Macchina","Brainrot God Lucky Block",
-        "Orcalero Orcala"
-    },
-    Test = { "Tung Tung Tung Sahur" }
-}
-local active = { Secrets = false, BrainrotGods = false, Test = false }
-
--- Pastas
-local movingFolder = Workspace:WaitForChild("MovingAnimals")
-local renderedFolder = Workspace:WaitForChild("RenderedMovingAnimals")
-
--- Mapas
-local movingByDisplay = {}   -- [DisplayName] = { modelos }
-local renderedByDisplay = {} -- [DisplayName] = { modelos }
-
--- Checa se DisplayName está nas listas ativas
-local function isSelectedDisplay(DisplayName)
-    for cat,list in pairs(groups) do
-        if active[cat] then
-            for _,name in ipairs(list) do
-                if name == DisplayName then
-                    return true
-                end
-            end
-        end
+local function safeFirePrompt(prompt, holdTime)
+    holdTime = holdTime or 2
+    if not prompt or not prompt:IsA("ProximityPrompt") then return false end
+    if firePromptFn then
+        local ok, err = pcall(function() firePromptFn(prompt, holdTime) end)
+        if ok then return true end
+        warn("[safeFirePrompt] firePrompt pcall failed:", err)
+    end
+    -- fallback: tentar VirtualInputManager (pode não existir)
+    local ok, vim = pcall(function() return game:GetService("VirtualInputManager") end)
+    if ok and vim then
+        pcall(function() vim:SendKeyEvent(true, Enum.KeyCode.E, false, game) end)
+        task.wait(holdTime)
+        pcall(function() vim:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
+        return true
     end
     return false
 end
 
--- Lê exatamente HumanoidRootPart.Info.DisplayName
-local function getDisplayName(model)
-    local hrp = model:FindFirstChild("HumanoidRootPart")
-    if not hrp then return nil end
-    local info = hrp:FindFirstChild("Info")
-    if not info then return nil end
-    local lbl = info:FindFirstChild("DisplayName")
-    if lbl and lbl:IsA("TextLabel") then
-        return lbl.Text
+-- achar um ProximityPrompt dentro do modelo
+local function acharPrompt(model)
+    for _,desc in ipairs(model:GetDescendants()) do
+        if desc:IsA("ProximityPrompt") then
+            return desc
+        end
     end
     return nil
 end
 
--- Seguir modelo até ser destruído
-local function followModel(model)
-    if not model or not model.Parent then return end
-    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
+-- encontra a melhor BasePart para seguir (HumanoidRootPart, RootPart, PrimaryPart, qualquer BasePart)
+local function acharParteAlvo(model)
+    if not model then return nil end
+    local try = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("RootPart") or model.PrimaryPart
+    if try and try:IsA("BasePart") then return try end
+    -- fallback: qualquer BasePart
+    for _,v in ipairs(model:GetDescendants()) do
+        if v:IsA("BasePart") then return v end
+    end
+    return nil
+end
 
-    print("[Follow] Seguindo modelo:", model.Name)
-    local conn
-    conn = RunService.Heartbeat:Connect(function()
+-- função principal: seguir e interagir enquanto o modelo existir
+local function seguirEInteragirAteSumir(model)
+    if not model or not model.Parent then return end
+
+    -- aguarda o character/humanoid prontos (timeout curto)
+    local char, humanoid, hrp = waitForCharacterParts(5)
+    if not char or not humanoid or not hrp then
+        warn("[seguirEInteragir] Character/Humanoid/HRP não prontos. Abortando.")
+        return
+    end
+
+    local modelName = model.Name
+    print(("[seguirEInteragir] Iniciando follow em modelo %s"):format(modelName))
+
+    local lastPrint = 0
+    local connection
+    connection = RunService.Heartbeat:Connect(function(dt)
+        -- se modelo acabou, desconecta e sai
         if not model or not model.Parent then
-            conn:Disconnect()
-            print("[Follow] Modelo destruído, parando.")
+            connection:Disconnect()
+            print(("[seguirEInteragir] Modelo %s removido — parando follow."):format(modelName))
             return
         end
-        local target = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart")
-        if target then
-            humanoid:MoveTo(target.Position)
+
+        -- achar parte alvo
+        local targetPart = acharParteAlvo(model)
+        if targetPart then
+            local targetPos = targetPart.Position
+            -- MoveTo só se estivermos longe o suficiente (reduz spam)
+            local dist = (hrp.Position - targetPos).Magnitude
+            if dist > 2.2 then
+                -- atualizar movimento constantemente
+                local ok, err = pcall(function() humanoid:MoveTo(targetPos) end)
+                if not ok then
+                    -- às vezes MoveTo pode falhar; logamos uma vez a cada 3s
+                    if tick() - lastPrint > 3 then
+                        warn("[seguirEInteragir] humanoid:MoveTo falhou:", err)
+                        lastPrint = tick()
+                    end
+                end
+            end
+
+            -- log leve de distância (apenas a cada ~2s)
+            if tick() - lastPrint > 2 then
+                print(("[seguirEInteragir] %s → dist = %.2f"):format(modelName, dist))
+                lastPrint = tick()
+            end
+        else
+            if tick() - lastPrint > 3 then
+                warn(("[seguirEInteragir] Nenhuma BasePart encontrada em %s (aguardando...)"):format(modelName))
+                lastPrint = tick()
+            end
+        end
+
+        -- procurar prompt no modelo e tentar interagir se achar
+        local prompt = acharPrompt(model)
+        if prompt then
+            -- opcional: checar distância ao prompt antes de interagir (se parent for BasePart)
+            local pparent = prompt.Parent
+            local promptPos = nil
+            if pparent and pparent:IsA("BasePart") then
+                promptPos = pparent.Position
+            elseif pparent and pparent:IsA("Attachment") and pparent.Parent and pparent.Parent:IsA("BasePart") then
+                promptPos = (pparent.Parent.CFrame * CFrame.new(pparent.Position)).p
+            end
+
+            local canTry = true
+            if promptPos and hrp then
+                local d = (hrp.Position - promptPos).Magnitude
+                -- se muito longe, não tentar (a menos que queira)
+                if d > (prompt.MaxActivationDistance + 6) then
+                    canTry = false
+                end
+            end
+
+            if canTry then
+                print(("[seguirEInteragir] Prompt encontrado em %s — tentando interagir"):format(modelName))
+                local ok = safeFirePrompt(prompt, 2)
+                if ok then
+                    print(("[seguirEInteragir] Interação disparada para %s"):format(modelName))
+                else
+                    warn(("[seguirEInteragir] Falha ao interagir com prompt em %s"):format(modelName))
+                end
+                -- após tentar, NÃO desconectamos imediatamente — mantemos seguindo até destruição, como pediu
+            end
         end
     end)
 end
 
--- Interagir com prompt de modelo em MovingAnimals
-local function interactWithPrompt(movingModel)
-    local prompt = movingModel and movingModel:FindFirstChildWhichIsA("ProximityPrompt", true)
-    if prompt and firePromptFn then
-        print("[Interact] Disparando prompt em", movingModel.Name)
-        firePromptFn(prompt, 2)
-    else
-        warn("[Interact] Nenhum prompt encontrado em", movingModel and movingModel.Name or "nil")
-    end
-end
+-- monitor: quando modelo novo for adicionado em MovingAnimals, checar DisplayName TextLabel
+local movingAnimals = Workspace:WaitForChild("MovingAnimals")
+movingAnimals.ChildAdded:Connect(function(model)
+    if not model or not model:IsA("Model") then return end
+    -- pequena espera para hierarquia replicar
+    task.wait(0.15)
 
--- Quando PromptShown em Rendered -> dispara prompt correspondente no Moving
-PPS.PromptShown:Connect(function(prompt)
-    local model = prompt:FindFirstAncestorWhichIsA("Model")
-    local DisplayName = model and getDisplayName(model)
-    if DisplayName and movingByDisplay[DisplayName] then
-        for _,movingModel in ipairs(movingByDisplay[DisplayName]) do
-            interactWithPrompt(movingModel)
+    local infoFolder = model:FindFirstChild("HumanoidRootPart") and model.HumanoidRootPart:FindFirstChild("Info")
+    if not infoFolder then
+        -- tentar aguardar por até 0.5s caso venha um pouco depois
+        task.wait(0.3)
+        infoFolder = model:FindFirstChild("HumanoidRootPart") and model.HumanoidRootPart:FindFirstChild("Info")
+    end
+    if not infoFolder then
+        -- sem Info — nada a fazer aqui
+        return
+    end
+
+    local displayLabel = infoFolder:FindFirstChild("DisplayName", true) -- busca recursiva
+    if displayLabel and displayLabel:IsA("TextLabel") then
+        local txt = displayLabel.Text or ""
+        print(("[Monitor] Modelo %s chegou — DisplayName = %q"):format(model.Name, txt))
+        if txt == "Tung Tung Tung Sahur" then
+            -- start follow (não bloqueante)
+            task.spawn(function()
+                seguirEInteragirAteSumir(model)
+            end)
         end
     end
 end)
 
--- Registrar modelo em MovingAnimals
-local function registerMoving(model)
-    local DisplayName = getDisplayName(model)
-    if not DisplayName then return end
-    movingByDisplay[DisplayName] = movingByDisplay[DisplayName] or {}
-    table.insert(movingByDisplay[DisplayName], model)
-    print("[Moving] Registrado:", DisplayName)
-
-    if isSelectedDisplay(DisplayName) and renderedByDisplay[DisplayName] then
-        for _,rendModel in ipairs(renderedByDisplay[DisplayName]) do
-            followModel(rendModel)
-        end
-    end
-end
-
--- Registrar modelo em RenderedMovingAnimals
-local function registerRendered(model)
-    local DisplayName = getDisplayName(model)
-    if not DisplayName then return end
-    renderedByDisplay[DisplayName] = renderedByDisplay[DisplayName] or {}
-    table.insert(renderedByDisplay[DisplayName], model)
-    print("[Rendered] Registrado:", DisplayName)
-
-    if isSelectedDisplay(DisplayName) and movingByDisplay[DisplayName] then
-        followModel(model)
-    end
-end
-
--- Conexões
-movingFolder.ChildAdded:Connect(registerMoving)
-renderedFolder.ChildAdded:Connect(registerRendered)
-
--- GUI simples
-do
-    local screen = Instance.new("ScreenGui", CoreGui)
-    screen.Name = "DisplaySelectUI"
-    local frame = Instance.new("Frame", screen)
-    frame.Size = UDim2.new(0,200,0,120)
-    frame.Position = UDim2.new(0,10,0,60)
-    frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
-
-    local function makeBtn(name, y)
-        local btn = Instance.new("TextButton", frame)
-        btn.Size = UDim2.new(1,-10,0,30)
-        btn.Position = UDim2.new(0,5,0,y)
-        btn.Text = name.." [OFF]"
-        btn.BackgroundColor3 = Color3.fromRGB(150,30,30)
-        btn.TextColor3 = Color3.new(1,1,1)
-        btn.MouseButton1Click:Connect(function()
-            active[name] = not active[name]
-            if active[name] then
-                btn.BackgroundColor3 = Color3.fromRGB(30,150,30)
-                btn.Text = name.." [ON]"
-            else
-                btn.BackgroundColor3 = Color3.fromRGB(150,30,30)
-                btn.Text = name.." [OFF]"
-            end
-        end)
-    end
-
-    makeBtn("Secrets", 10)
-    makeBtn("BrainrotGods", 45)
-    makeBtn("Test", 80)
-end
-
-print("[Script] Pronto para monitorar DisplayName case-sensitive.")
+print("[Script] Monitor inicial pronto.")
