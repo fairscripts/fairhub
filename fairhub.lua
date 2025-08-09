@@ -4,10 +4,9 @@ local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local PPS = game:GetService("ProximityPromptService")
-local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
--- Garante que PlayerGui está pronto
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 5) or LocalPlayer:FindFirstChildOfClass("PlayerGui")
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- Pasta alvo
 local alvo = Workspace:WaitForChild("RenderedMovingAnimals")
@@ -45,7 +44,7 @@ end
 -- Estado dos botões
 local state = { Secrets = false, BrainrotGods = false, Test = false }
 
--- Criar container da UI
+-- Criar UI
 local function createGuiContainer()
     local gui = Instance.new("ScreenGui")
     gui.Name = "DetectorUI_"..tostring(math.random(1000,9999))
@@ -58,7 +57,6 @@ end
 
 local gui = createGuiContainer()
 
--- Criar frame base
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0, 220, 0, 170)
 frame.Position = UDim2.new(0, 10, 0, 60)
@@ -99,7 +97,7 @@ makeToggle("Secrets", 6, "Secrets")
 makeToggle("BrainrotGods", 46, "BrainrotGods")
 makeToggle("Test", 86, "Test")
 
--- Função de notificação
+-- Notificação
 local function notify(msg)
     pcall(function()
         StarterGui:SetCore("SendNotification", {
@@ -110,7 +108,7 @@ local function notify(msg)
     end)
 end
 
--- Função para seguir modelo
+-- Seguir modelo
 local function seguirModelo(obj)
     local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
     if not humanoid then return end
@@ -134,18 +132,22 @@ local function seguirModelo(obj)
     end)
 end
 
--- Evento: PromptShown aciona fireproximityprompt
+-- Quando prompt aparecer, tentar interagir várias vezes
 PPS.PromptShown:Connect(function(prompt)
     if prompt:IsDescendantOf(alvo) then
-        task.delay(0.1, function()
-            pcall(function()
-                fireproximityprompt(prompt, 1)
-            end)
+        task.spawn(function()
+            prompt.Enabled = true
+            for i = 1, 5 do
+                pcall(function()
+                    fireproximityprompt(prompt, 1)
+                end)
+                task.wait(0.2)
+            end
         end)
     end
 end)
 
--- Detectar novos objetos
+-- Detectar novos modelos e seguir se ativo
 alvo.ChildAdded:Connect(function(obj)
     local g = nameToGroup[obj.Name]
     if g and state[g] then
