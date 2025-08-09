@@ -5,7 +5,9 @@ local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local PPS = game:GetService("ProximityPromptService")
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Garante que PlayerGui está pronto
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 5) or LocalPlayer:FindFirstChildOfClass("PlayerGui")
 
 -- Pasta alvo
 local alvo = Workspace:WaitForChild("RenderedMovingAnimals")
@@ -45,21 +47,12 @@ local state = { Secrets = false, BrainrotGods = false, Test = false }
 
 -- Criar container da UI
 local function createGuiContainer()
-    local ok, container
-    if type(gethui) == "function" then
-        ok, container = pcall(gethui)
-        if ok and typeof(container) == "Instance" then
-        else
-            container = nil
-        end
-    end
-    container = container or PlayerGui
     local gui = Instance.new("ScreenGui")
     gui.Name = "DetectorUI_"..tostring(math.random(1000,9999))
     gui.ResetOnSpawn = false
     gui.IgnoreGuiInset = true
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.Parent = container
+    gui.Parent = PlayerGui or game:GetService("CoreGui")
     return gui
 end
 
@@ -71,7 +64,6 @@ frame.Size = UDim2.new(0, 220, 0, 170)
 frame.Position = UDim2.new(0, 10, 0, 60)
 frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
 frame.BorderSizePixel = 0
-frame.BackgroundTransparency = 0.02
 
 local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1,0,0,34)
@@ -109,32 +101,19 @@ makeToggle("Test", 86, "Test")
 
 -- Função de notificação
 local function notify(msg)
-    local success = pcall(function()
+    pcall(function()
         StarterGui:SetCore("SendNotification", {
             Title = "Detector",
             Text = msg,
             Duration = 4
         })
     end)
-    if success then return end
-    local label = Instance.new("TextLabel", gui)
-    label.Size = UDim2.new(0.6,0,0,40)
-    label.Position = UDim2.new(0.2,0,0.02,0)
-    label.BackgroundColor3 = Color3.fromRGB(25,25,25)
-    label.TextColor3 = Color3.fromRGB(255,255,255)
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 16
-    label.Text = msg
-    label.BorderSizePixel = 0
-    task.delay(4, function() if label then label:Destroy() end end)
 end
 
 -- Função para seguir modelo
 local function seguirModelo(obj)
-    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
     if not humanoid then return end
-
     local conn
     conn = RunService.Heartbeat:Connect(function()
         if not obj or not obj.Parent then
@@ -155,11 +134,8 @@ local function seguirModelo(obj)
     end)
 end
 
--- Evento: quando prompt aparece, tenta interagir
-PPS.PromptShown:Connect(function(prompt, inputType)
-    local obj = prompt.Parent
-    if not obj then return end
-    -- verifica se pertence a RenderedMovingAnimals
+-- Evento: PromptShown aciona fireproximityprompt
+PPS.PromptShown:Connect(function(prompt)
     if prompt:IsDescendantOf(alvo) then
         task.delay(0.1, function()
             pcall(function()
@@ -169,12 +145,11 @@ PPS.PromptShown:Connect(function(prompt, inputType)
     end
 end)
 
--- Monitorar RenderedMovingAnimals
+-- Detectar novos objetos
 alvo.ChildAdded:Connect(function(obj)
     local g = nameToGroup[obj.Name]
     if g and state[g] then
         notify("["..g.."] "..obj.Name)
-        print("Detectado:", "Workspace.RenderedMovingAnimals."..obj.Name)
         seguirModelo(obj)
     end
 end)
