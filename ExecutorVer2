@@ -148,9 +148,10 @@ mainFrame.BackgroundTransparency = 0.1
 mainFrame.ZIndex = 2
 mainFrame.Active = true
 mainFrame.Draggable = true
-mainFrame.AutomaticSize = Enum.AutomaticSize.None
-mainFrame:SetAttribute("SelectedTab", "Auto Farm")
-mainFrame.UICorner = Instance.new("UICorner", mainFrame)
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 8)
+mainCorner.Parent = mainFrame
 
 -- Abas
 local tabs = { "Auto Farm", "Misc" }
@@ -159,13 +160,19 @@ local tabButtons = {}
 local tabFrame = Instance.new("Frame", mainFrame)
 tabFrame.Size = UDim2.new(0.3, 0, 1, 0)
 tabFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-Instance.new("UICorner", tabFrame)
+
+local tabCorner = Instance.new("UICorner")
+tabCorner.CornerRadius = UDim.new(0, 8)
+tabCorner.Parent = tabFrame
 
 local contentFrame = Instance.new("Frame", mainFrame)
 contentFrame.Size = UDim2.new(0.7, 0, 1, 0)
 contentFrame.Position = UDim2.new(0.3, 0, 0, 0)
 contentFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-Instance.new("UICorner", contentFrame)
+
+local contentCorner = Instance.new("UICorner")
+contentCorner.CornerRadius = UDim.new(0, 8)
+contentCorner.Parent = contentFrame
 
 -- Função para mudar aba
 local function switchTab(tabName)
