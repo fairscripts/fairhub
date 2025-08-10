@@ -1,0 +1,313 @@
+--[[ 
+AutoFarm Script com UI e Debug
+Executar no Delta
+--]]
+
+-------------------------------
+-- Configurações Iniciais
+-------------------------------
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+
+-- Listas de nomes
+local lists = {
+    Secrets = {
+        "La Vacca Saturno Saturnita", "Karkerkar Kurkur", "Chimpanzini Spiderini", "Agarrini la Palini",
+        "Los Tralaleritos", "Las Tralaleritas", "Las Vaquitas Saturnitas", "Graipuss Medussi",
+        "Chicleteira Bicicleteira", "La Grande Combinasion", "Los Combinasionas", "Nuclearo Dinossauro",
+        "Los Hotspotsitos", "Garama and Madundung", "Dragon Cannelloni", "Secret Lucky Block",
+        "Pot Hotspot", "Esok Sekolah"
+    },
+    BrainrotGods = {
+        "Cocofanto Elefanto", "Girafa Celestre", "Gattatino Neonino", "Matteo", "Tralalero Tralala",
+        "Los Crocodillitos", "Espresso Signora", "Odin Din Din Dun", "Statutino Libertino",
+        "Tukanno Bananno", "Trenostruzzo Turbo 3000", "Trippi Troppi Troppa Trippa", "Ballerino Lololo",
+        "Los Tungtungtungcitos", "Piccione Macchina", "Brainrot God Lucky Block", "Orcalero Orcala"
+    },
+    Test = {
+        "Tung Tung Tung Sahur"
+    }
+}
+
+local activeLists = { Secrets = false, BrainrotGods = false, Test = false }
+
+-------------------------------
+-- Funções Auxiliares
+-------------------------------
+local function waitForCharacterParts(timeout)
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local ok = pcall(function() char:WaitForChild("Humanoid", timeout) end)
+    local ok2 = pcall(function() char:WaitForChild("HumanoidRootPart", timeout) end)
+    return char, (ok and char:FindFirstChildOfClass("Humanoid")), (ok2 and char:FindFirstChild("HumanoidRootPart"))
+end
+
+-- Detectar função de fireproximityprompt segura
+local firePromptFn
+if typeof(fireproximityprompt) == "function" then
+    firePromptFn = fireproximityprompt
+elseif typeof(fireProximityPrompt) == "function" then
+    firePromptFn = fireProximityPrompt
+else
+    firePromptFn = nil
+end
+
+local function safeFirePrompt(prompt, holdTime)
+    holdTime = holdTime or 2
+    if not prompt or not prompt:IsA("ProximityPrompt") then return false end
+    if firePromptFn then
+        local ok, err = pcall(function() firePromptFn(prompt, holdTime) end)
+        if ok then return true end
+        warn("[safeFirePrompt] firePrompt pcall failed:", err)
+    end
+    local ok, vim = pcall(function() return game:GetService("VirtualInputManager") end)
+    if ok and vim then
+        pcall(function() vim:SendKeyEvent(true, Enum.KeyCode.E, false, game) end)
+        task.wait(holdTime)
+        pcall(function() vim:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
+        return true
+    end
+    return false
+end
+
+local function acharPrompt(model)
+    for _,desc in ipairs(model:GetDescendants()) do
+        if desc:IsA("ProximityPrompt") then
+            return desc
+        end
+    end
+    return nil
+end
+
+local function acharParteAlvo(model)
+    if not model then return nil end
+    local try = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("RootPart") or model.PrimaryPart
+    if try and try:IsA("BasePart") then return try end
+    for _,v in ipairs(model:GetDescendants()) do
+        if v:IsA("BasePart") then return v end
+    end
+    return nil
+end
+
+-------------------------------
+-- UI
+-------------------------------
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "FollowUI"
+ScreenGui.Parent = game:GetService("CoreGui")
+
+-- Frame principal (25% largura, 40% altura)
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0.25, 0, 0.4, 0)
+mainFrame.Position = UDim2.new(0.5, -mainFrame.Size.X.Offset/2, 0.5, -mainFrame.Size.Y.Offset/2)
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = ScreenGui
+mainFrame.ClipsDescendants = true
+mainFrame.BackgroundTransparency = 0.1
+mainFrame.AutomaticSize = Enum.AutomaticSize.None
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.ZIndex = 2
+mainFrame.Visible = true
+mainFrame.ClipsDescendants = false
+mainFrame.Parent = ScreenGui
+mainFrame.BackgroundTransparency = 0.05
+mainFrame.BorderSizePixel = 0
+mainFrame.Name = "MainFrame"
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+mainFrame:SetAttribute("CornerRadius", UDim.new(0, 8))
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
+
+-- Aba lateral
+local tabFrame = Instance.new("Frame")
+tabFrame.Size = UDim2.new(0.3, 0, 1, 0)
+tabFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+tabFrame.BorderSizePixel = 0
+tabFrame.Parent = mainFrame
+Instance.new("UICorner", tabFrame).CornerRadius = UDim.new(0, 8)
+
+-- Conteúdo
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(0.7, 0, 1, 0)
+contentFrame.Position = UDim2.new(0.3, 0, 0, 0)
+contentFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+contentFrame.BorderSizePixel = 0
+contentFrame.Parent = mainFrame
+Instance.new("UICorner", contentFrame).CornerRadius = UDim.new(0, 8)
+
+-- Função de trocar abas
+local currentTab = nil
+local function switchTab(tabName)
+    for _,child in ipairs(contentFrame:GetChildren()) do
+        if child:IsA("Frame") then
+            child.Visible = (child.Name == tabName)
+        end
+    end
+    currentTab = tabName
+end
+
+-- Criar botões de aba
+local function createTabButton(name, order)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 40)
+    btn.Position = UDim2.new(0, 0, 0, (order-1)*40)
+    btn.Text = name
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Parent = tabFrame
+    btn.MouseButton1Click:Connect(function()
+        switchTab(name)
+    end)
+end
+
+createTabButton("Auto Farm", 1)
+createTabButton("Misc", 2)
+
+-- Aba Auto Farm
+local autoFarmFrame = Instance.new("Frame")
+autoFarmFrame.Size = UDim2.new(1, 0, 1, 0)
+autoFarmFrame.BackgroundTransparency = 1
+autoFarmFrame.Name = "Auto Farm"
+autoFarmFrame.Parent = contentFrame
+
+local function createCheckbox(parent, label, listName, posY)
+    local cbFrame = Instance.new("Frame")
+    cbFrame.Size = UDim2.new(1, -10, 0, 30)
+    cbFrame.Position = UDim2.new(0, 5, 0, posY)
+    cbFrame.BackgroundTransparency = 1
+    cbFrame.Parent = parent
+
+    local cb = Instance.new("TextButton")
+    cb.Size = UDim2.new(0, 24, 0, 24)
+    cb.Position = UDim2.new(0, 0, 0, 3)
+    cb.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    cb.Text = ""
+    cb.Parent = cbFrame
+    Instance.new("UICorner", cb).CornerRadius = UDim.new(0, 6)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -30, 1, 0)
+    lbl.Position = UDim2.new(0, 30, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = label
+    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = cbFrame
+
+    cb.MouseButton1Click:Connect(function()
+        activeLists[listName] = not activeLists[listName]
+        cb.BackgroundColor3 = activeLists[listName] and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(100, 100, 100)
+    end)
+end
+
+createCheckbox(autoFarmFrame, "AutoFarm Secrets", "Secrets", 20)
+createCheckbox(autoFarmFrame, "AutoFarm Brainrot Gods", "BrainrotGods", 60)
+createCheckbox(autoFarmFrame, "AutoFarm Test", "Test", 100)
+
+-- Aba Misc (vazia)
+local miscFrame = Instance.new("Frame")
+miscFrame.Size = UDim2.new(1, 0, 1, 0)
+miscFrame.BackgroundTransparency = 1
+miscFrame.Name = "Misc"
+miscFrame.Parent = contentFrame
+
+switchTab("Auto Farm")
+
+-------------------------------
+-- Lógica de seguir e interagir
+-------------------------------
+local function seguirEInteragirAteSumir(model, displayName)
+    local char, humanoid, hrp = waitForCharacterParts(5)
+    if not char or not humanoid or not hrp then return end
+
+    print(string.format("[DEBUG] Iniciando follow em %s (%s)", model.Name, displayName))
+
+    local lastPrint, lastFireTime, tentativas = 0, 0, 0
+    local seguindoUI = Instance.new("TextLabel")
+    seguindoUI.Size = UDim2.new(0, 300, 0, 30)
+    seguindoUI.Position = UDim2.new(1, -310, 1, -40)
+    seguindoUI.AnchorPoint = Vector2.new(0, 1)
+    seguindoUI.BackgroundTransparency = 0.3
+    seguindoUI.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    seguindoUI.TextColor3 = Color3.fromRGB(255, 255, 255)
+    seguindoUI.Text = "Seguindo " .. displayName
+    seguindoUI.Parent = ScreenGui
+    Instance.new("UICorner", seguindoUI).CornerRadius = UDim.new(0, 6)
+
+    local connection
+    connection = RunService.Heartbeat:Connect(function()
+        if not model or not model.Parent then
+            connection:Disconnect()
+            seguindoUI:Destroy()
+            print(string.format("[DEBUG] Modelo %s removido, parando follow", model.Name))
+            return
+        end
+
+        local targetPart = acharParteAlvo(model)
+        if targetPart then
+            local dist = (hrp.Position - targetPart.Position).Magnitude
+            if tick() - lastPrint > 2 then
+                print(string.format("[DEBUG] Distância até %s: %.2f", displayName, dist))
+                lastPrint = tick()
+            end
+            if dist > 2.2 then
+                pcall(function() humanoid:MoveTo(targetPart.Position) end)
+            end
+        end
+
+        local prompt = acharPrompt(model)
+        if prompt then
+            local promptPos = prompt.Parent:IsA("BasePart") and prompt.Parent.Position or nil
+            if promptPos and (hrp.Position - promptPos).Magnitude <= 10 then
+                if tentativas < 5 and tick() - lastFireTime >= 2 then
+                    print("[DEBUG] Disparando fireproximityprompt")
+                    safeFirePrompt(prompt, 2)
+                    tentativas = tentativas + 1
+                    lastFireTime = tick()
+                elseif tentativas >= 5 then
+                    print("[DEBUG] Tentativas máximas atingidas, parando follow")
+                    connection:Disconnect()
+                    seguindoUI:Destroy()
+                end
+            end
+        else
+            print("[DEBUG] ProximityPrompt não encontrado, parando follow")
+            connection:Disconnect()
+            seguindoUI:Destroy()
+        end
+    end)
+end
+
+-------------------------------
+-- Monitor de MovingAnimals
+-------------------------------
+local movingAnimals = Workspace:WaitForChild("MovingAnimals")
+movingAnimals.ChildAdded:Connect(function(model)
+    if not model:IsA("Model") then return end
+    task.wait(0.5)
+
+    local infoFolder = model:FindFirstChild("HumanoidRootPart") and model.HumanoidRootPart:FindFirstChild("Info")
+    if not infoFolder then return end
+
+    local displayLabel = infoFolder:FindFirstChild("DisplayName", true)
+    if not (displayLabel and displayLabel:IsA("TextLabel")) then return end
+    local txt = displayLabel.Text or ""
+
+    print(string.format("[DEBUG] Modelo spawnado: ID=%s, DisplayName=%s", model.Name, txt))
+
+    for listName, names in pairs(lists) do
+        if activeLists[listName] then
+            for _, name in ipairs(names) do
+                if txt == name then
+                    task.spawn(function()
+                        seguirEInteragirAteSumir(model, txt)
+                    end)
+                    return
+                end
+            end
+        end
+    end
+end)
