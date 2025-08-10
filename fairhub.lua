@@ -1,211 +1,145 @@
--- Logger + Interação para ProximityPrompts em Workspace.RenderedMovingAnimals
+--[[
+UI de Auto Farm + Misc com abas
+Mostra no canto inferior direito "Seguindo (DisplayName)" quando seguir
+Usa PlayerGui (seguro para LocalScripts)
+]]
+
 local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local PPS = game:GetService("ProximityPromptService")
-local UIS = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+-- Remove se já existir
+local old = PlayerGui:FindFirstChild("FollowUI")
+if old then old:Destroy() end
 
--- pasta alvo
-local alvo = Workspace:WaitForChild("RenderedMovingAnimals")
+-- ======== LISTA DE ESTADOS ========
+local activeLists = {
+    Secrets = false,
+    BrainrotGods = false,
+    Test = false
+}
 
--- util: monta o caminho completo do objeto
-local function getPath(obj)
-    if not obj then return "nil" end
-    local parts = {}
-    local cur = obj
-    while cur and cur ~= game do
-        table.insert(parts, 1, cur.Name)
-        cur = cur.Parent
-    end
-    return table.concat(parts, ".")
+-- ======== FUNÇÃO CRIAR UI ========
+local FollowUI = Instance.new("ScreenGui")
+FollowUI.Name = "FollowUI"
+FollowUI.ResetOnSpawn = false
+FollowUI.Parent = PlayerGui
+
+-- Container principal
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 400, 0, 250)
+MainFrame.Position = UDim2.new(0, 50, 0, 100)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.Parent = FollowUI
+
+-- ======== Aba lateral ========
+local Sidebar = Instance.new("Frame")
+Sidebar.Size = UDim2.new(0, 100, 1, 0)
+Sidebar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Sidebar.Parent = MainFrame
+
+-- Aba buttons
+local tabs = {}
+local function createTabButton(name, order)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 40)
+    btn.Position = UDim2.new(0, 0, 0, (order - 1) * 45 + 10)
+    btn.Text = name
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Parent = Sidebar
+    tabs[name] = btn
+    return btn
 end
 
--- util: print formatado (timestamp + caminho + detalhes)
-local function log(fmt, ...)
-    local ts = os.date("%H:%M:%S")
-    local args = {...}
-    for i=1,#args do
-        if typeof(args[i]) == "Instance" then
-            args[i] = getPath(args[i])
-        else
-            args[i] = tostring(args[i])
-        end
-    end
-    print(string.format("[%s] %s", ts, string.format(fmt, unpack(args))))
+local AutoFarmTabBtn = createTabButton("Auto Farm", 1)
+local MiscTabBtn = createTabButton("Misc", 2)
+
+-- ======== Área de conteúdo ========
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, -100, 1, 0)
+ContentFrame.Position = UDim2.new(0, 100, 0, 0)
+ContentFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+ContentFrame.Parent = MainFrame
+
+-- Subframes de conteúdo
+local AutoFarmFrame = Instance.new("Frame")
+AutoFarmFrame.Size = UDim2.new(1, 0, 1, 0)
+AutoFarmFrame.BackgroundTransparency = 1
+AutoFarmFrame.Parent = ContentFrame
+
+local MiscFrame = Instance.new("Frame")
+MiscFrame.Size = UDim2.new(1, 0, 1, 0)
+MiscFrame.BackgroundTransparency = 1
+MiscFrame.Visible = false
+MiscFrame.Parent = ContentFrame
+
+-- ======== Checkboxes para Auto Farm ========
+local function createCheckbox(text, order, toggleVar)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 250, 0, 30)
+    btn.Position = UDim2.new(0, 20, 0, (order - 1) * 40 + 20)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Text = "[OFF] " .. text
+    btn.Parent = AutoFarmFrame
+
+    btn.MouseButton1Click:Connect(function()
+        activeLists[toggleVar] = not activeLists[toggleVar]
+        btn.Text = (activeLists[toggleVar] and "[ON] " or "[OFF] ") .. text
+        btn.BackgroundColor3 = activeLists[toggleVar] and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+    end)
 end
 
--- tabela pra guardar prompts que já estamos monitorando
-local monitored = {}
+createCheckbox("Auto Farm Secrets", 1, "Secrets")
+createCheckbox("Auto Farm Brainrot Gods", 2, "BrainrotGods")
+createCheckbox("Auto Farm Test", 3, "Test")
 
-local function attachPrompt(prompt)
-    if not prompt or monitored[prompt] then return end
-    monitored[prompt] = true
-    pcall(function()
-        prompt.PromptShown:Connect(function(inputType)
-            log("PromptShown -> %s (inputType=%s)", prompt, tostring(inputType))
-        end)
-    end)
-    pcall(function()
-        prompt.PromptHidden:Connect(function(inputType)
-            log("PromptHidden -> %s (inputType=%s)", prompt, tostring(inputType))
-        end)
-    end)
-    pcall(function()
-        prompt.Triggered:Connect(function(...)
-            local args = {...}
-            if #args == 0 then
-                log("Prompt.Triggered (no args) -> %s", prompt)
-            else
-                local s = ""
-                for i=1,#args do s = s .. tostring(args[i]) .. (i<#args and ", " or "") end
-                log("Prompt.Triggered -> %s (args=%s)", prompt, s)
-            end
-        end)
-    end)
-    log("Attached to prompt: %s", prompt)
+-- ======== Alternar abas ========
+local function selectTab(tabName)
+    -- reset cores
+    for name, btn in pairs(tabs) do
+        btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    end
+    tabs[tabName].BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+
+    -- mostrar frame certo
+    AutoFarmFrame.Visible = (tabName == "Auto Farm")
+    MiscFrame.Visible = (tabName == "Misc")
 end
 
--- funções do serviço
-pcall(function()
-    PPS.PromptShown:Connect(function(prompt, inputType)
-        log("Service.PromptShown -> %s (inputType=%s)", prompt, tostring(inputType))
-    end)
-end)
-pcall(function()
-    PPS.PromptHidden:Connect(function(prompt, inputType)
-        log("Service.PromptHidden -> %s (inputType=%s)", prompt, tostring(inputType))
-    end)
-end)
-pcall(function()
-    PPS.PromptTriggered:Connect(function(prompt, player)
-        log("Service.PromptTriggered -> %s (player=%s)", prompt, player and player.Name or "nil")
-    end)
-end)
+AutoFarmTabBtn.MouseButton1Click:Connect(function() selectTab("Auto Farm") end)
+MiscTabBtn.MouseButton1Click:Connect(function() selectTab("Misc") end)
 
--- varre um ancestor (ex: model/pasta) em busca de ProximityPrompts
-local function scanForPrompts(root)
-    for _, desc in ipairs(root:GetDescendants()) do
-        if desc:IsA("ProximityPrompt") then
-            attachPrompt(desc)
-        end
-    end
+-- seleciona Auto Farm como padrão
+selectTab("Auto Farm")
+
+-- ======== Painel de status (Seguindo ...) ========
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(0, 300, 0, 40)
+StatusLabel.Position = UDim2.new(1, -320, 1, -60)
+StatusLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+StatusLabel.BackgroundTransparency = 0.3
+StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+StatusLabel.TextSize = 18
+StatusLabel.Font = Enum.Font.SourceSansBold
+StatusLabel.Text = ""
+StatusLabel.Visible = false
+StatusLabel.Parent = FollowUI
+
+-- função para exibir quando começar a seguir
+local function showFollowing(displayName)
+    StatusLabel.Text = "Seguindo (" .. displayName .. ")"
+    StatusLabel.Visible = true
 end
 
-log("Iniciando scan inicial em %s", getPath(alvo))
-scanForPrompts(alvo)
-
-alvo.DescendantAdded:Connect(function(desc)
-    if desc:IsA("ProximityPrompt") then
-        attachPrompt(desc)
-    elseif desc:IsA("Model") or desc:IsA("Folder") or desc:IsA("BasePart") then
-        task.defer(function()
-            scanForPrompts(desc)
-        end)
-    end
-end)
-
--- encontra o prompt mais próximo do jogador
-local function findNearestPrompt(maxDist)
-    local char = LocalPlayer.Character
-    local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart)
-    if not hrp then return nil, math.huge end
-    local best, bestDist = nil, math.huge
-    for promptObj,_ in pairs(monitored) do
-        if promptObj and promptObj.Parent then
-            local parent = promptObj.Parent
-            local pos
-            if parent:IsA("BasePart") then
-                pos = parent.Position
-            elseif parent:IsA("Model") and parent.PrimaryPart then
-                pos = parent.PrimaryPart.Position
-            else
-                local bp = parent:FindFirstChildWhichIsA("BasePart", true)
-                if bp then pos = bp.Position end
-            end
-            if pos then
-                local d = (hrp.Position - pos).Magnitude
-                if d < bestDist then
-                    bestDist = d
-                    best = promptObj
-                end
-            end
-        end
-    end
-    if bestDist <= (maxDist or 10) then
-        return best, bestDist
-    else
-        return nil, bestDist
-    end
+local function hideFollowing()
+    StatusLabel.Visible = false
 end
 
--- função para interagir com prompt
-local function interagirPrompt(prompt, holdTime)
-    holdTime = holdTime or 2
-    if not prompt or not prompt:IsA("ProximityPrompt") then
-        log("Prompt inválido para interação.")
-        return
-    end
+-- Exemplo de uso:
+-- showFollowing("Tung Tung Tung Sahur")
+-- task.wait(5)
+-- hideFollowing()
 
-    -- mover até prompt
-    local parent = prompt.Parent
-    local pos
-    if parent:IsA("BasePart") then
-        pos = parent.Position
-    elseif parent:IsA("Model") and parent.PrimaryPart then
-        pos = parent.PrimaryPart.Position
-    else
-        local bp = parent:FindFirstChildWhichIsA("BasePart", true)
-        if bp then pos = bp.Position end
-    end
-    if pos then
-        local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid:MoveTo(pos)
-            humanoid.MoveToFinished:Wait(holdTime)
-        end
-    end
-
-    -- tentar interação
-    local firePrompt = (typeof(fireproximityprompt) == "function" and fireproximityprompt)
-        or (typeof(fireProximityPrompt) == "function" and fireProximityPrompt)
-
-    if firePrompt then
-        pcall(function() firePrompt(prompt, holdTime) end)
-    elseif game:GetService("VirtualInputManager") then
-        local VIM = game:GetService("VirtualInputManager")
-        VIM:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-        task.wait(holdTime)
-        VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-    else
-        log("Nenhum método de interação disponível para %s", prompt)
-    end
-end
-
--- interagir ao apertar E
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.E then
-        local prompt, dist = findNearestPrompt(12)
-        if prompt then
-            interagirPrompt(prompt, 5)
-        else
-            log("Nenhum prompt próximo (dist mais próxima = %.2f)", dist)
-        end
-    end
-end)
-
--- interagir automaticamente quando prompt novo aparecer
-alvo.DescendantAdded:Connect(function(desc)
-    if desc:IsA("ProximityPrompt") then
-        task.delay(0.5, function()
-            local prompt, dist = findNearestPrompt(12)
-            if prompt then
-                interagirPrompt(prompt, 5)
-            end
-        end)
-    end
-end)
-
-log("Atualmente monitorando prompts: %d", (function() local c=0; for _ in pairs(monitored) do c=c+1 end; return c end)())
+print("[FollowUI] Interface criada com abas e painel de status prontos.")
