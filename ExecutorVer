@@ -20,7 +20,7 @@ local lists = {
                 "Brainrot God Lucky Block", "Orcalero Orcala" },
     Test = { "Tung Tung Tung Sahur" }
 }
-local activeLists = { Secrets = false, BrainrotGods = false, Test = false }
+local activeLists = { Secrets = false, BrainrotGods = false, Test = true }
 
 -- helper: esperar character/humanoid/hrp
 local function waitForCharacterParts(timeout)
