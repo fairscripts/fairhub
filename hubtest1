@@ -1,4 +1,3 @@
--- Seguir modelo até ele sumir + interagir quando DisplayName estiver na lista selecionada via GUI
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
@@ -49,57 +48,112 @@ local lists = {
         "Tung Tung Tung Sahur"
     }
 }
-
--- status de cada botão
 local activeLists = { Secrets = false, BrainrotGods = false, Test = false }
 
 -- ===================== GUI =====================
-local function createToggleButton(name, posY)
-    local ScreenGui = game:GetService("CoreGui"):FindFirstChild("FollowUI") or Instance.new("ScreenGui")
-    ScreenGui.Name = "FollowUI"
-    ScreenGui.Parent = game:GetService("CoreGui")
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "FollowUI"
+ScreenGui.Parent = game:GetService("CoreGui")
 
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(0, 200, 0, 40)
-    button.Position = UDim2.new(0, 20, 0, posY)
-    button.Text = name .. " [OFF]"
-    button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.Parent = ScreenGui
+-- Sidebar
+local sidebar = Instance.new("Frame", ScreenGui)
+sidebar.Size = UDim2.new(0, 150, 1, 0)
+sidebar.Position = UDim2.new(0, 0, 0, 0)
+sidebar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 
-    button.MouseButton1Click:Connect(function()
-        activeLists[name] = not activeLists[name]
-        button.Text = name .. (activeLists[name] and " [ON]" or " [OFF]")
-        button.BackgroundColor3 = activeLists[name] and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+-- Tab Buttons
+local tabs = {}
+local currentTab = nil
+
+local function createTabButton(name, order)
+    local btn = Instance.new("TextButton", sidebar)
+    btn.Size = UDim2.new(1, 0, 0, 40)
+    btn.Position = UDim2.new(0, 0, 0, (order - 1) * 45)
+    btn.Text = name
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+
+    btn.MouseButton1Click:Connect(function()
+        for tabName, tabData in pairs(tabs) do
+            tabData.Frame.Visible = (tabName == name)
+            tabData.Button.BackgroundColor3 = (tabName == name) and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+        end
+        currentTab = name
+    end)
+    return btn
+end
+
+-- Content Frame
+local contentFrame = Instance.new("Frame", ScreenGui)
+contentFrame.Size = UDim2.new(1, -150, 1, 0)
+contentFrame.Position = UDim2.new(0, 150, 0, 0)
+contentFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+
+local function createTab(name)
+    local frame = Instance.new("Frame", contentFrame)
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundTransparency = 1
+    frame.Visible = false
+    tabs[name] = { Frame = frame, Button = createTabButton(name, #tabs + 1) }
+    return frame
+end
+
+-- Auto Farm Tab
+local autoFarmTab = createTab("Auto Farm")
+local function createCheckbox(text, yPos, listName)
+    local cb = Instance.new("TextButton", autoFarmTab)
+    cb.Size = UDim2.new(0, 200, 0, 30)
+    cb.Position = UDim2.new(0, 20, 0, yPos)
+    cb.Text = text .. " [OFF]"
+    cb.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    cb.TextColor3 = Color3.new(1, 1, 1)
+
+    cb.MouseButton1Click:Connect(function()
+        activeLists[listName] = not activeLists[listName]
+        cb.Text = text .. (activeLists[listName] and " [ON]" or " [OFF]")
+        cb.BackgroundColor3 = activeLists[listName] and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
     end)
 end
+createCheckbox("Auto Farm Secrets", 50, "Secrets")
+createCheckbox("Auto Farm Brainrot Gods", 90, "BrainrotGods")
+createCheckbox("Auto Farm Test", 130, "Test")
 
-createToggleButton("Secrets", 100)
-createToggleButton("BrainrotGods", 150)
-createToggleButton("Test", 200)
+-- Misc Tab
+createTab("Misc")
 
--- ===================== FUNÇÕES AUXILIARES =====================
+-- Default tab
+tabs["Auto Farm"].Button:MouseButton1Click()
+
+-- Label Seguindo
+local seguindoLabel = Instance.new("TextLabel", ScreenGui)
+seguindoLabel.Size = UDim2.new(0, 300, 0, 30)
+seguindoLabel.Position = UDim2.new(1, -310, 1, -40)
+seguindoLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+seguindoLabel.BackgroundTransparency = 0.4
+seguindoLabel.TextColor3 = Color3.new(1, 1, 1)
+seguindoLabel.TextScaled = true
+seguindoLabel.Visible = false
+
+-- ===================== LÓGICA DE FOLLOW =====================
 local function waitForCharacterParts(timeout)
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local ok = pcall(function() char:WaitForChild("Humanoid", timeout) end)
-    local ok2 = pcall(function() char:WaitForChild("HumanoidRootPart", timeout) end)
-    return char, (ok and char:FindFirstChildOfClass("Humanoid")), (ok2 and char:FindFirstChild("HumanoidRootPart"))
+    local hum = char:WaitForChild("Humanoid", timeout)
+    local hrp = char:WaitForChild("HumanoidRootPart", timeout)
+    return char, hum, hrp
 end
 
--- Detectar função nativa de prompt
-local firePromptFn
-if typeof(fireproximityprompt) == "function" then
-    firePromptFn = fireproximityprompt
-elseif typeof(fireProximityPrompt) == "function" then
-    firePromptFn = fireProximityPrompt
-else
-    firePromptFn = nil
+local function safeFirePrompt(prompt, holdTime)
+    holdTime = holdTime or 2
+    if not prompt or not prompt:IsA("ProximityPrompt") then return false end
+    print("[DEBUG] Tentando acionar ProximityPrompt")
+    pcall(function() fireproximityprompt(prompt, holdTime) end)
+    return true
 end
 
--- FUNÇÃO antiga simplificada de achar prompt
 local function acharPrompt(model)
     for _,desc in ipairs(model:GetDescendants()) do
         if desc:IsA("ProximityPrompt") then
+            print("[DEBUG] ProximityPrompt encontrado")
             return desc
         end
     end
@@ -107,80 +161,60 @@ local function acharPrompt(model)
 end
 
 local function acharParteAlvo(model)
-    if not model then return nil end
-    local try = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("RootPart") or model.PrimaryPart
-    if try and try:IsA("BasePart") then return try end
-    for _,v in ipairs(model:GetDescendants()) do
-        if v:IsA("BasePart") then return v end
-    end
-    return nil
+    return model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart")
 end
 
--- ===================== LÓGICA DE FOLLOW =====================
-local function seguirEInteragirAteSumir(model)
+local function seguirEInteragirAteSumir(model, displayName)
     if not model or not model.Parent then return end
-
     local char, humanoid, hrp = waitForCharacterParts(5)
-    if not char or not humanoid or not hrp then
-        warn("[seguirEInteragir] Character/Humanoid/HRP não prontos. Abortando.")
-        return
-    end
+    seguindoLabel.Text = "Seguindo (" .. displayName .. ")"
+    seguindoLabel.Visible = true
+    print("[DEBUG] Iniciando seguir " .. displayName)
 
-    local modelName = model.Name
-    print(("[seguirEInteragir] Iniciando follow em modelo %s"):format(modelName))
-
-    local lastFireTime, tentativas = 0, 0
+    local tentativas, lastFireTime = 0, 0
     local connection
     connection = RunService.Heartbeat:Connect(function()
         if not model or not model.Parent then
             connection:Disconnect()
-            print(("[seguirEInteragir] Modelo %s removido — parando follow."):format(modelName))
+            seguindoLabel.Visible = false
+            print("[DEBUG] Modelo removido, parando seguir")
             return
         end
 
-        local targetPart = acharParteAlvo(model)
-        if targetPart then
-            local dist = (hrp.Position - targetPart.Position).Magnitude
-            if dist > 2.2 then
-                pcall(function() humanoid:MoveTo(targetPart.Position) end)
-            end
+        local alvo = acharParteAlvo(model)
+        if alvo then
+            local dist = (hrp.Position - alvo.Position).Magnitude
+            if dist > 2 then humanoid:MoveTo(alvo.Position) end
         end
 
         local prompt = acharPrompt(model)
-        if prompt and tentativas < 5 and tick() - lastFireTime >= 2 then
-            if firePromptFn then
-                firePromptFn(prompt)
-            else
-                warn("[seguirEInteragir] Nenhuma função nativa de prompt encontrada.")
+        if prompt and (hrp.Position - prompt.Parent.Position).Magnitude <= 10 then
+            if tentativas < 5 and tick() - lastFireTime >= 2 then
+                tentativas += 1
+                lastFireTime = tick()
+                safeFirePrompt(prompt, 2)
             end
-            tentativas = tentativas + 1
-            lastFireTime = tick()
         end
     end)
 end
 
--- ===================== MONITOR DE MOVINGANIMALS =====================
+-- ===================== MONITOR =====================
 local movingAnimals = Workspace:WaitForChild("MovingAnimals")
 movingAnimals.ChildAdded:Connect(function(model)
-    if not model:IsA("Model") then return end
-    task.wait(0.5) -- dar tempo de carregar Info
-
+    task.wait(0.5)
     local infoFolder = model:FindFirstChild("HumanoidRootPart") and model.HumanoidRootPart:FindFirstChild("Info")
     if not infoFolder then return end
-
     local displayLabel = infoFolder:FindFirstChild("DisplayName", true)
     if not (displayLabel and displayLabel:IsA("TextLabel")) then return end
 
-    local txt = displayLabel.Text or ""
-    print(("[Monitor] Modelo %s chegou — DisplayName = %q"):format(model.Name, txt))
+    local displayName = displayLabel.Text
+    print("[DEBUG] Novo modelo detectado: " .. displayName)
 
     for listName, names in pairs(lists) do
         if activeLists[listName] then
             for _, name in ipairs(names) do
-                if txt == name then
-                    task.spawn(function()
-                        seguirEInteragirAteSumir(model)
-                    end)
+                if displayName == name then
+                    seguirEInteragirAteSumir(model, displayName)
                     return
                 end
             end
@@ -188,4 +222,4 @@ movingAnimals.ChildAdded:Connect(function(model)
     end
 end)
 
-print("[Script] Pronto — use os botões para ativar listas e seguir modelos.")
+print("[Script] Pronto — UI e lógica integradas.")
