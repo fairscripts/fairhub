@@ -1,28 +1,33 @@
---[[ Delta-ready AutoFarm com safeFirePrompt robusto e UI.
-     Mantém a lógica de follow/prints que já estava funcionando. ]]
-
+--========================================================--
+-- Configurações iniciais
+--========================================================--
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
--- listas (mantidas)
+-- Listas
 local lists = {
-    Secrets = { "La Vacca Saturno Saturnita", "Karkerkar Kurkur", "Chimpanzini Spiderini", "Agarrini la Palini",
-                "Los Tralaleritos", "Las Tralaleritas", "Las Vaquitas Saturnitas", "Graipuss Medussi",
-                "Chicleteira Bicicleteira", "La Grande Combinasion", "Los Combinasionas", "Nuclearo Dinossauro",
-                "Los Hotspotsitos", "Garama and Madundung", "Dragon Cannelloni", "Secret Lucky Block",
-                "Pot Hotspot", "Esok Sekolah" },
-    BrainrotGods = { "Cocofanto Elefanto", "Girafa Celestre", "Gattatino Neonino", "Matteo", "Tralalero Tralala",
-                "Los Crocodillitos", "Espresso Signora", "Odin Din Din Dun", "Statutino Libertino",
-                "Tukanno Bananno", "Trenostruzzo Turbo 3000", "Trippi Troppi Troppa Trippa",
-                "Ballerino Lololo", "Los Tungtungtungcitos", "Piccione Macchina",
-                "Brainrot God Lucky Block", "Orcalero Orcala" },
+    Secrets = {
+        "La Vacca Saturno Saturnita","Karkerkar Kurkur","Chimpanzini Spiderini",
+        "Agarrini la Palini","Los Tralaleritos","Las Tralaleritas","Las Vaquitas Saturnitas",
+        "Graipuss Medussi","Chicleteira Bicicleteira","La Grande Combinasion","Los Combinasionas",
+        "Nuclearo Dinossauro","Los Hotspotsitos","Garama and Madundung","Dragon Cannelloni",
+        "Secret Lucky Block","Pot Hotspot","Esok Sekolah"
+    },
+    BrainrotGods = {
+        "Cocofanto Elefanto","Girafa Celestre","Gattatino Neonino","Matteo","Tralalero Tralala",
+        "Los Crocodillitos","Espresso Signora","Odin Din Din Dun","Statutino Libertino",
+        "Tukanno Bananno","Trenostruzzo Turbo 3000","Trippi Troppi Troppa Trippa","Ballerino Lololo",
+        "Los Tungtungtungcitos","Piccione Macchina","Brainrot God Lucky Block","Orcalero Orcala"
+    },
     Test = { "Tung Tung Tung Sahur" }
 }
-local activeLists = { Secrets = false, BrainrotGods = false, Test = true }
+local activeLists = { Secrets = false, BrainrotGods = false, Test = false }
 
--- helper: esperar character/humanoid/hrp
+--========================================================--
+-- Funções auxiliares
+--========================================================--
 local function waitForCharacterParts(timeout)
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local ok = pcall(function() char:WaitForChild("Humanoid", timeout) end)
@@ -30,268 +35,229 @@ local function waitForCharacterParts(timeout)
     return char, (ok and char:FindFirstChildOfClass("Humanoid")), (ok2 and char:FindFirstChild("HumanoidRootPart"))
 end
 
--- encontrar prompt e parte alvo (mantido)
+-- Detecta função nativa
+local firePromptFn
+if typeof(fireproximityprompt) == "function" then
+    firePromptFn = fireproximityprompt
+elseif typeof(fireProximityPrompt) == "function" then
+    firePromptFn = fireProximityPrompt
+end
+
+local function safeFirePrompt(prompt, holdTime)
+    holdTime = holdTime or 2
+    if not prompt or not prompt:IsA("ProximityPrompt") then return false end
+    if firePromptFn then
+        local ok, err = pcall(function() firePromptFn(prompt, holdTime) end)
+        if ok then return true end
+        warn("[safeFirePrompt] Nativo falhou:", err)
+    end
+    -- fallback
+    local ok, vim = pcall(function() return game:GetService("VirtualInputManager") end)
+    if ok and vim then
+        pcall(function() vim:SendKeyEvent(true, Enum.KeyCode.E, false, game) end)
+        task.wait(holdTime)
+        pcall(function() vim:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
+        return true
+    end
+    return false
+end
+
 local function acharPrompt(model)
     for _,desc in ipairs(model:GetDescendants()) do
-        if desc:IsA("ProximityPrompt") then
-            return desc
-        end
+        if desc:IsA("ProximityPrompt") then return desc end
     end
-    return nil
 end
+
 local function acharParteAlvo(model)
-    if not model then return nil end
     local try = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("RootPart") or model.PrimaryPart
     if try and try:IsA("BasePart") then return try end
     for _,v in ipairs(model:GetDescendants()) do
         if v:IsA("BasePart") then return v end
     end
-    return nil
 end
 
--- ---------- robust safeFirePrompt ----------
-local camera = workspace.CurrentCamera
-
--- tenta diferentes assinaturas de fireproximityprompt existentes (retorna true se algum funcionou)
-local function tryCallNativeFire(prompt, holdTime)
-    if not prompt then return false, "prompt nil" end
-    local tries = {
-        function() return fireproximityprompt(prompt, holdTime) end,
-        function() return fireproximityprompt(prompt) end,
-        function() return fireProximityPrompt(prompt, holdTime) end,
-        function() return fireProximityPrompt(prompt) end,
-    }
-    for i,fn in ipairs(tries) do
-        local ok, res = pcall(fn)
-        if ok then
-            return true, ("native_variant_%d_ok"):format(i)
-        else
-            -- captura erro para debug
-            -- não abortar: tentar próxima variante
-        end
-    end
-    return false, "native_all_failed"
-end
-
--- converte posição world -> viewport (Vector2) se estiver on-screen
-local function worldPosToViewportVec2(worldPos)
-    if not camera then camera = workspace.CurrentCamera end
-    if not camera then return nil end
-    local sPos, onScreen = camera:WorldToViewportPoint(worldPos)
-    if not onScreen then return nil end
-    return Vector2.new(sPos.X, sPos.Y)
-end
-
--- tenta "clicar e segurar" no ponto do prompt usando VirtualInputManager (fallback visual)
-local function tryVIMClickHold(prompt, holdTime)
-    local ok, vim = pcall(function() return game:GetService("VirtualInputManager") end)
-    if not ok or not vim then
-        return false, "no_vim"
-    end
-
-    -- calcula posição do prompt no mundo (cobre Parent BasePart e Attachment cases)
-    local promptParent = prompt.Parent
-    local worldPos
-    if promptParent:IsA("BasePart") then
-        worldPos = promptParent.Position
-    elseif promptParent:IsA("Attachment") and promptParent.Parent and promptParent.Parent:IsA("BasePart") then
-        worldPos = (promptParent.Parent.CFrame * CFrame.new(promptParent.Position)).p
-    else
-        -- tentar achar qualquer BasePart no ancestor
-        local bp = promptParent:FindFirstChildWhichIsA("BasePart", true) or prompt:FindFirstChildWhichIsA("BasePart", true)
-        if bp then worldPos = bp.Position end
-    end
-    if not worldPos then return false, "no_worldpos" end
-
-    local screenPos = worldPosToViewportVec2(worldPos)
-    if not screenPos then return false, "offscreen" end
-
-    -- tentar enviar um clique longo na posição
-    local x, y = screenPos.X, screenPos.Y
-    local ok1, err1 = pcall(function() vim:SendMouseButtonEvent(x, y, true, game) end)
-    if not ok1 then return false, ("vim_down_err:%s"):format(tostring(err1)) end
-    task.wait(holdTime)
-    pcall(function() vim:SendMouseButtonEvent(x, y, false, game) end)
-    return true, "vim_click_hold_ok"
-end
-
--- último recurso: enviar tecla 'E' via VirtualInputManager (pode não funcionar em mobile)
-local function trySendKeyE(holdTime)
-    local ok, vim = pcall(function() return game:GetService("VirtualInputManager") end)
-    if not ok or not vim then return false, "no_vim_key" end
-    pcall(function() vim:SendKeyEvent(true, Enum.KeyCode.E, false, game) end)
-    task.wait(holdTime)
-    pcall(function() vim:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
-    return true, "send_key_e_ok"
-end
-
--- wrapper principal que tenta todas as opções e debuga
-local function safeFirePrompt(prompt, holdTime)
-    holdTime = holdTime or 2
-    if not prompt or not prompt:IsA("ProximityPrompt") then
-        print("[safeFirePrompt] prompt inválido")
-        return false
-    end
-
-    print("[safeFirePrompt] tentando native call...")
-    local ok, info = tryCallNativeFire(prompt, holdTime)
-    if ok then
-        print("[safeFirePrompt] native worked ->", info)
-        return true
-    else
-        print("[safeFirePrompt] native failed ->", info)
-    end
-
-    -- pequena espera para permitir UI aparecer
-    task.wait(0.05)
-
-    print("[safeFirePrompt] tentando VirtualInputManager click-hold...")
-    local ok2, info2 = tryVIMClickHold(prompt, holdTime)
-    if ok2 then
-        print("[safeFirePrompt] VIM click hold worked ->", info2)
-        return true
-    else
-        print("[safeFirePrompt] VIM click failed ->", info2)
-    end
-
-    print("[safeFirePrompt] tentando enviar tecla E como fallback...")
-    local ok3, info3 = trySendKeyE(holdTime)
-    if ok3 then
-        print("[safeFirePrompt] SendKey E worked ->", info3)
-        return true
-    else
-        print("[safeFirePrompt] SendKey E failed ->", info3)
-    end
-
-    print("[safeFirePrompt] todas tentativas falharam")
-    return false
-end
--- ---------- fim safeFirePrompt ----------
-
--- UI simples (mantida do seu último script, centralizada 25%x40%)
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FollowUI"
-ScreenGui.Parent = game:GetService("CoreGui")
-
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0.25, 0, 0.4, 0)
-mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-mainFrame.BackgroundColor3 = Color3.fromRGB(25,25,25)
-mainFrame.Parent = ScreenGui
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0,8)
-
--- (cria abas/checkboxes etc) --- omito aqui para brevidade, mantenha a UI que você já tem
--- ... (coloque aqui a UI do seu script anterior, sem modificar a lógica)
-
--- segue / interage (usando safeFirePrompt)
+--========================================================--
+-- Lógica de seguir e interagir
+--========================================================--
 local function seguirEInteragirAteSumir(model, displayName)
     local char, humanoid, hrp = waitForCharacterParts(5)
-    if not char or not humanoid or not hrp then
-        warn("[Follow] Character não pronto, abortando follow")
-        return
-    end
+    if not char or not humanoid or not hrp then return end
 
-    print(("[Spawn] Iniciando follow -> ID=%s, DisplayName=%s"):format(model.Name, displayName))
-    -- cria UI de seguindo (se quiser, use a sua)
-    local seguindoLabel = Instance.new("TextLabel", ScreenGui)
-    seguindoLabel.Size = UDim2.new(0, 300, 0, 30)
-    seguindoLabel.Position = UDim2.new(1, -310, 1, -40)
-    seguindoLabel.BackgroundTransparency = 0.3
-    seguindoLabel.Text = "Seguindo ("..tostring(displayName)..")"
-    Instance.new("UICorner", seguindoLabel).CornerRadius = UDim.new(0,6)
+    print(("[DEBUG] Iniciando follow no modelo: %s | DisplayName: %s"):format(model.Name, displayName))
 
-    local lastDistPrint = 0
-    local lastFireTime = 0
-    local tries = 0
-    local conn
-    conn = RunService.Heartbeat:Connect(function()
+    local lastPrint, lastFireTime, tentativas = 0, 0, 0
+    local connection
+    connection = RunService.Heartbeat:Connect(function()
         if not model or not model.Parent then
-            conn:Disconnect()
-            seguindoLabel:Destroy()
-            print(("[Follow] Modelo %s removido — parando follow"):format(tostring(displayName)))
+            print("[DEBUG] Modelo removido — parando follow.")
+            connection:Disconnect()
             return
         end
 
-        -- move para a parte alvo
         local targetPart = acharParteAlvo(model)
         if targetPart then
             local dist = (hrp.Position - targetPart.Position).Magnitude
-            if tick() - lastDistPrint > 2 then
-                print(("[Follow] Distância para %s: %.2f"):format(tostring(displayName), dist))
-                lastDistPrint = tick()
+            if tick() - lastPrint > 2 then
+                print(("[DEBUG] Distância do modelo: %.2f studs"):format(dist))
+                lastPrint = tick()
             end
-            if dist > 2.2 then
-                pcall(function() humanoid:MoveTo(targetPart.Position) end)
-            end
+            if dist > 2.2 then pcall(function() humanoid:MoveTo(targetPart.Position) end) end
         end
 
-        -- achar prompt
         local prompt = acharPrompt(model)
-        if not prompt then
-            print(("[Prompt] ProximityPrompt não encontrado para %s — parando follow"):format(tostring(displayName)))
-            conn:Disconnect()
-            seguindoLabel:Destroy()
-            return
-        end
-
-        -- só contar tentativas quando estiver a menos de 10 studs do prompt/basepart
-        local promptPos
-        local pparent = prompt.Parent
-        if pparent and pparent:IsA("BasePart") then
-            promptPos = pparent.Position
-        elseif pparent and pparent:IsA("Attachment") and pparent.Parent and pparent.Parent:IsA("BasePart") then
-            promptPos = (pparent.Parent.CFrame * CFrame.new(pparent.Position)).p
-        else
-            local bp = prompt:FindFirstChildWhichIsA("BasePart", true) or prompt.Parent:FindFirstChildWhichIsA("BasePart", true)
-            if bp then promptPos = bp.Position end
-        end
-
-        local distToPrompt = math.huge
-        if promptPos and hrp then
-            distToPrompt = (hrp.Position - promptPos).Magnitude
-        end
-
-        if distToPrompt <= 10 then
-            if tries >= 5 then
-                print(("[Prompt] Limite de 5 tentativas atingido para %s — parando follow"):format(tostring(displayName)))
-                conn:Disconnect()
-                seguindoLabel:Destroy()
-                return
+        if prompt then
+            local promptPos
+            if prompt.Parent:IsA("BasePart") then
+                promptPos = prompt.Parent.Position
+            elseif prompt.Parent:IsA("Attachment") and prompt.Parent.Parent:IsA("BasePart") then
+                promptPos = prompt.Parent.Parent.Position
             end
-            if tick() - lastFireTime >= 2 then
-                print(("[Prompt] Tentativa %d: disparando fire para %s"):format(tries+1, tostring(displayName)))
-                local ok = safeFirePrompt(prompt, 2)
-                if ok then
-                    print(("[Prompt] fireproximityprompt disparado com sucesso para %s"):format(tostring(displayName)))
-                else
-                    print(("[Prompt] fireproximityprompt falhou para %s"):format(tostring(displayName)))
+            if promptPos and (hrp.Position - promptPos).Magnitude <= 10 then
+                if tentativas < 5 and tick() - lastFireTime >= 2 then
+                    print(("[DEBUG] Disparando ProximityPrompt (%d/5)"):format(tentativas+1))
+                    safeFirePrompt(prompt, 2)
+                    tentativas += 1
+                    lastFireTime = tick()
+                elseif tentativas >= 5 then
+                    print("[DEBUG] Limite de tentativas atingido — parando follow.")
+                    connection:Disconnect()
                 end
-                tries = tries + 1
-                lastFireTime = tick()
             end
         else
-            -- não chegou dentro do raio de 10 studs; não contamos tentativas
+            print("[DEBUG] ProximityPrompt sumiu — parando follow.")
+            connection:Disconnect()
         end
     end)
 end
 
--- monitor (como você já tinha)
+--========================================================--
+-- UI Melhorada
+--========================================================--
+local gui = Instance.new("ScreenGui")
+gui.Name = "FollowUI"
+gui.Parent = game:GetService("CoreGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0.25, 0, 0.4, 0) -- 25% horizontal / 40% vertical
+mainFrame.Position = UDim2.new(0.375, 0, 0.3, 0) -- centralizado
+mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = gui
+mainFrame.ClipsDescendants = true
+mainFrame.BackgroundTransparency = 0.1
+mainFrame.ZIndex = 2
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.AutomaticSize = Enum.AutomaticSize.None
+mainFrame:SetAttribute("SelectedTab", "Auto Farm")
+mainFrame.UICorner = Instance.new("UICorner", mainFrame)
+
+-- Abas
+local tabs = { "Auto Farm", "Misc" }
+local tabButtons = {}
+
+local tabFrame = Instance.new("Frame", mainFrame)
+tabFrame.Size = UDim2.new(0.3, 0, 1, 0)
+tabFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Instance.new("UICorner", tabFrame)
+
+local contentFrame = Instance.new("Frame", mainFrame)
+contentFrame.Size = UDim2.new(0.7, 0, 1, 0)
+contentFrame.Position = UDim2.new(0.3, 0, 0, 0)
+contentFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Instance.new("UICorner", contentFrame)
+
+-- Função para mudar aba
+local function switchTab(tabName)
+    mainFrame:SetAttribute("SelectedTab", tabName)
+    for name, btn in pairs(tabButtons) do
+        btn.BackgroundColor3 = (name == tabName) and Color3.fromRGB(70, 130, 180) or Color3.fromRGB(45, 45, 45)
+    end
+    for _, child in pairs(contentFrame:GetChildren()) do
+        if child:IsA("Frame") then child.Visible = (child.Name == tabName) end
+    end
+end
+
+-- Criar botões das abas
+for i, tabName in ipairs(tabs) do
+    local btn = Instance.new("TextButton", tabFrame)
+    btn.Size = UDim2.new(1, 0, 0, 40)
+    btn.Position = UDim2.new(0, 0, 0, (i-1)*40)
+    btn.Text = tabName
+    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    Instance.new("UICorner", btn)
+    btn.MouseButton1Click:Connect(function() switchTab(tabName) end)
+    tabButtons[tabName] = btn
+end
+
+-- Conteúdo Auto Farm
+local autoFarmFrame = Instance.new("Frame", contentFrame)
+autoFarmFrame.Size = UDim2.new(1, 0, 1, 0)
+autoFarmFrame.BackgroundTransparency = 1
+autoFarmFrame.Name = "Auto Farm"
+
+local function createCheckbox(text, listKey, order)
+    local holder = Instance.new("Frame", autoFarmFrame)
+    holder.Size = UDim2.new(1, -10, 0, 40)
+    holder.Position = UDim2.new(0, 5, 0, (order-1)*45)
+    holder.BackgroundTransparency = 1
+
+    local box = Instance.new("TextButton", holder)
+    box.Size = UDim2.new(0, 30, 0, 30)
+    box.Position = UDim2.new(0, 0, 0.5, -15)
+    box.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    Instance.new("UICorner", box)
+    box.Text = ""
+    box.MouseButton1Click:Connect(function()
+        activeLists[listKey] = not activeLists[listKey]
+        box.BackgroundColor3 = activeLists[listKey] and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+    end)
+
+    local label = Instance.new("TextLabel", holder)
+    label.Size = UDim2.new(1, -40, 1, 0)
+    label.Position = UDim2.new(0, 40, 0, 0)
+    label.Text = text
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.BackgroundTransparency = 1
+end
+
+createCheckbox("AutoFarm Secrets", "Secrets", 1)
+createCheckbox("AutoFarm BrainrotGods", "BrainrotGods", 2)
+createCheckbox("AutoFarm Test", "Test", 3)
+
+-- Aba Misc
+local miscFrame = Instance.new("Frame", contentFrame)
+miscFrame.Size = UDim2.new(1, 0, 1, 0)
+miscFrame.BackgroundTransparency = 1
+miscFrame.Name = "Misc"
+
+switchTab("Auto Farm")
+
+--========================================================--
+-- Monitor de MovingAnimals
+--========================================================--
 local movingAnimals = Workspace:WaitForChild("MovingAnimals")
 movingAnimals.ChildAdded:Connect(function(model)
-    task.wait(0.5)
     if not model:IsA("Model") then return end
+    task.wait(0.5)
+
     local infoFolder = model:FindFirstChild("HumanoidRootPart") and model.HumanoidRootPart:FindFirstChild("Info")
     if not infoFolder then return end
+
     local displayLabel = infoFolder:FindFirstChild("DisplayName", true)
     if not (displayLabel and displayLabel:IsA("TextLabel")) then return end
     local txt = displayLabel.Text or ""
-    print(("[Spawn] Modelo spawnado -> ID=%s | DisplayName=%s"):format(tostring(model.Name), tostring(txt)))
+    print(("[DEBUG] Modelo detectado: %s | DisplayName: %s"):format(model.Name, txt))
+
     for listName, names in pairs(lists) do
         if activeLists[listName] then
-            for _,name in ipairs(names) do
+            for _, name in ipairs(names) do
                 if txt == name then
-                    task.spawn(function() seguirEInteragirAteSumir(model, txt) end)
+                    task.spawn(function()
+                        seguirEInteragirAteSumir(model, txt)
+                    end)
                     return
                 end
             end
@@ -299,4 +265,4 @@ movingAnimals.ChildAdded:Connect(function(model)
     end
 end)
 
-print("[SCRIPT] carregado — tentando usar native fire + fallbacks. Veja logs para detalhes.")
+print("[Script] Pronto — use a UI para ativar listas e seguir modelos.")
