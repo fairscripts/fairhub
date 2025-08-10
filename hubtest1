@@ -45,7 +45,7 @@ local lists = {
         "Orcalero Orcala"
     },
     Test = {
-        "Tung Tung Tung Sahur"
+        "Tim Cheese"
     }
 }
 local activeLists = { Secrets = false, BrainrotGods = false, Test = false }
