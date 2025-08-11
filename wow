@@ -1,0 +1,391 @@
+-- CÓDIGO DE TESTE DA UI - ESTILO JANELA
+-- Este script foi adaptado para ser executado via Delta Executor.
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+-- Cria a ScreenGui diretamente, pois não está em StarterGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "ExecutorUI"
+gui.Parent = LocalPlayer.PlayerGui
+
+-- As listas e o estado ativo foram mantidos para que os botões de toggle funcionem
+local activeLists = { Secrets = false, BrainrotGods = false, Test = false }
+
+--========================================================--
+-- UI Principal (Estilo de Janela)
+--========================================================--
+local isVisible = false
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "WindowUI"
+mainFrame.Size = UDim2.new(0, 500, 0, 350)
+mainFrame.Position = UDim2.new(0.5, -250, 0.5, -175)
+mainFrame.BackgroundColor3 = Color3.fromRGB(240, 240, 240)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = gui
+mainFrame.ClipsDescendants = true
+mainFrame.ZIndex = 2
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Visible = false
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 10)
+mainCorner.Parent = mainFrame
+
+local titleBar = Instance.new("Frame", mainFrame)
+titleBar.Size = UDim2.new(1, 0, 0, 30)
+titleBar.BackgroundColor3 = Color3.fromRGB(240, 240, 240)
+titleBar.BorderSizePixel = 0
+titleBar.ZIndex = 3
+
+local titleLabel = Instance.new("TextLabel", titleBar)
+titleLabel.Size = UDim2.new(1, -90, 1, 0)
+titleLabel.Position = UDim2.new(0, 5, 0, 0)
+titleLabel.Text = "Steal a Brainrot - Chilli Hub Pre - By KhanhSky"
+titleLabel.Font = Enum.Font.SourceSans
+titleLabel.TextSize = 14
+titleLabel.TextColor3 = Color3.fromRGB(50, 50, 50)
+titleLabel.BackgroundTransparency = 1
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local controlsFrame = Instance.new("Frame", titleBar)
+controlsFrame.Size = UDim2.new(0, 90, 1, 0)
+controlsFrame.Position = UDim2.new(1, -90, 0, 0)
+controlsFrame.BackgroundTransparency = 1
+controlsFrame.ZIndex = 4
+
+local controlsLayout = Instance.new("UIListLayout", controlsFrame)
+controlsLayout.FillDirection = Enum.FillDirection.Horizontal
+controlsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+controlsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+controlsLayout.Padding = UDim.new(0, 5)
+
+local defaultButtonColor = Color3.fromRGB(240, 240, 240)
+local hoverColor = Color3.fromRGB(200, 220, 255)
+
+local minimizeButton = Instance.new("TextButton", controlsFrame)
+minimizeButton.Size = UDim2.new(0, 25, 0, 25)
+minimizeButton.BackgroundColor3 = defaultButtonColor
+minimizeButton.BorderSizePixel = 0
+minimizeButton.Text = "-"
+minimizeButton.Font = Enum.Font.SourceSans
+minimizeButton.TextSize = 24
+minimizeButton.TextColor3 = Color3.fromRGB(50, 50, 50)
+minimizeButton.MouseEnter:Connect(function() minimizeButton.BackgroundColor3 = hoverColor end)
+minimizeButton.MouseLeave:Connect(function() minimizeButton.BackgroundColor3 = defaultButtonColor end)
+
+
+local closeButton = Instance.new("TextButton", controlsFrame)
+closeButton.Size = UDim2.new(0, 25, 0, 25)
+closeButton.BackgroundColor3 = defaultButtonColor
+closeButton.BorderSizePixel = 0
+closeButton.Text = "x"
+closeButton.Font = Enum.Font.SourceSans
+closeButton.TextSize = 24
+closeButton.TextColor3 = Color3.fromRGB(50, 50, 50)
+closeButton.MouseEnter:Connect(function() closeButton.BackgroundColor3 = hoverColor end)
+closeButton.MouseLeave:Connect(function() closeButton.BackgroundColor3 = defaultButtonColor end)
+closeButton.MouseButton1Click:Connect(function()
+	mainFrame.Visible = false
+end)
+
+
+local separatorBar = Instance.new("Frame", mainFrame)
+separatorBar.Size = UDim2.new(0.8, 0, 0, 1)
+separatorBar.AnchorPoint = Vector2.new(0.5, 0)
+separatorBar.Position = UDim2.new(0.5, 0, 0, 35)
+separatorBar.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+separatorBar.BorderSizePixel = 0
+separatorBar.ZIndex = 4
+
+local contentFrame = Instance.new("Frame", mainFrame)
+contentFrame.Size = UDim2.new(1, 0, 1, -36)
+contentFrame.Position = UDim2.new(0, 0, 0, 36)
+contentFrame.BackgroundTransparency = 1
+contentFrame.ZIndex = 2
+
+local sidebarFrame = Instance.new("Frame", contentFrame)
+sidebarFrame.Size = UDim2.new(0, 100, 1, 0)
+sidebarFrame.BackgroundColor3 = Color3.fromRGB(240, 240, 240)
+sidebarFrame.BorderSizePixel = 0
+sidebarFrame.ZIndex = 2
+
+local sidebarPadding = Instance.new("UIPadding", sidebarFrame)
+sidebarPadding.PaddingTop = UDim.new(0, 10)
+
+local mainContentArea = Instance.new("Frame", contentFrame)
+mainContentArea.Size = UDim2.new(1, -140, 1, 0)
+mainContentArea.Position = UDim2.new(0, 140, 0, 0)
+mainContentArea.BackgroundColor3 = Color3.fromRGB(240, 240, 240)
+mainContentArea.BorderSizePixel = 0
+mainContentArea.ZIndex = 2
+
+local contentPadding = Instance.new("UIPadding", mainContentArea)
+contentPadding.PaddingLeft = UDim.new(0, 10)
+contentPadding.PaddingTop = UDim.new(0, 10)
+
+--========================================================--
+-- Lógica das Abas
+--========================================================--
+local tabButtons = {}
+local tabContents = {}
+
+local function createTabButton(tabName, iconText, yOffset)
+	local btn = Instance.new("TextButton", sidebarFrame)
+	btn.Name = tabName .. "Tab"
+	btn.Size = UDim2.new(1, -10, 0, 30)
+	btn.Position = UDim2.new(0.5, 0, 0, yOffset)
+	btn.AnchorPoint = Vector2.new(0.5, 0)
+	btn.BackgroundColor3 = Color3.fromRGB(240, 240, 240)
+	btn.BackgroundTransparency = 1
+	btn.ZIndex = 3
+	btn.Text = ""
+
+	local selectionIndicator = Instance.new("Frame", btn)
+	selectionIndicator.Name = "SelectionIndicator"
+	selectionIndicator.Size = UDim2.new(0, 5, 1, 0)
+	selectionIndicator.Position = UDim2.new(0, 0, 0, 0)
+	selectionIndicator.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+	selectionIndicator.BorderSizePixel = 0
+	selectionIndicator.ZIndex = 4
+	selectionIndicator.Visible = false
+
+	local corner = Instance.new("UICorner", selectionIndicator)
+	corner.CornerRadius = UDim.new(0, 2)
+	
+	local contentWrapper = Instance.new("Frame", btn)
+	contentWrapper.Name = "ContentWrapper"
+	contentWrapper.Size = UDim2.new(1, -10, 1, 0)
+	contentWrapper.Position = UDim2.new(0.5, 0, 0.5, 0)
+	contentWrapper.AnchorPoint = Vector2.new(0.5, 0.5)
+	contentWrapper.BackgroundTransparency = 1
+
+	local contentLayout = Instance.new("UIListLayout", contentWrapper)
+	contentLayout.FillDirection = Enum.FillDirection.Horizontal
+	contentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	contentLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	contentLayout.Padding = UDim.new(0, 5)
+
+	local icon = Instance.new("TextLabel", contentWrapper)
+	icon.Size = UDim2.new(0, 20, 1, 0)
+	icon.Text = iconText or ""
+	icon.Font = Enum.Font.SourceSans
+	icon.TextSize = 18
+	icon.TextColor3 = Color3.fromRGB(50, 50, 50)
+	icon.BackgroundTransparency = 1
+
+	local textLabel = Instance.new("TextLabel", contentWrapper)
+	textLabel.Size = UDim2.new(0, 50, 1, 0)
+	textLabel.Text = tabName
+	textLabel.Font = Enum.Font.SourceSans
+	textLabel.TextSize = 14
+	textLabel.TextColor3 = Color3.fromRGB(50, 50, 50)
+	textLabel.BackgroundTransparency = 1
+
+	return btn
+end
+
+local function switchTab(tabName)
+	for name, btn in pairs(tabButtons) do
+		local indicator = btn:FindFirstChild("SelectionIndicator")
+		local contentWrapper = btn:FindFirstChild("ContentWrapper")
+		local textLabel = contentWrapper and contentWrapper:FindFirstChildOfClass("TextLabel")
+
+		if textLabel then
+			textLabel.Font = (name == tabName) and Enum.Font.SourceSansBold or Enum.Font.SourceSans
+			textLabel.TextColor3 = (name == tabName) and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(50, 50, 50)
+		end
+
+		if indicator then
+			indicator.Visible = (name == tabName)
+		end
+	end
+	for name, content in pairs(tabContents) do
+		content.Visible = (name == tabName)
+	end
+end
+
+-- Esta função agora cria os botões de toggle e os posiciona corretamente
+local function createToggle(text, listKey)
+	local holder = Instance.new("Frame")
+	holder.Size = UDim2.new(1, -20, 0, 40)
+	holder.Position = UDim2.new(0, 10, 0, 0)
+	holder.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
+	holder.BorderSizePixel = 0
+	Instance.new("UICorner", holder).CornerRadius = UDim.new(0, 8)
+
+	local label = Instance.new("TextLabel", holder)
+	label.Size = UDim2.new(1, -55, 1, 0)
+	label.Position = UDim2.new(0, 10, 0, 0)
+	label.Text = text
+	label.Font = Enum.Font.SourceSans
+	label.TextSize = 14
+	label.TextColor3 = Color3.fromRGB(50, 50, 50)
+	label.BackgroundTransparency = 1
+	label.TextXAlignment = Enum.TextXAlignment.Left
+
+	local toggleBtn = Instance.new("TextButton", holder)
+	toggleBtn.Size = UDim2.new(0, 40, 0, 20)
+	toggleBtn.Position = UDim2.new(1, -50, 0.5, -10)
+	toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+	toggleBtn.BorderSizePixel = 0
+	toggleBtn.Text = ""
+	Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0.5, 0)
+
+	local toggleHandle = Instance.new("Frame", toggleBtn)
+	toggleHandle.Size = UDim2.new(0, 18, 0, 18)
+	toggleHandle.Position = UDim2.new(0, 1, 0, 1)
+	toggleHandle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	Instance.new("UICorner", toggleHandle).CornerRadius = UDim.new(0.5, 0)
+
+	local function updateToggleVisual()
+		if activeLists[listKey] then
+			toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+			TweenService:Create(toggleHandle, TweenInfo.new(0.2), { Position = UDim2.new(1, -19, 0.5, -9) }):Play()
+		else
+			toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+			TweenService:Create(toggleHandle, TweenInfo.new(0.2), { Position = UDim2.new(0, 1, 0.5, -9) }):Play()
+		end
+	end
+
+	toggleBtn.MouseButton1Click:Connect(function()
+		activeLists[listKey] = not activeLists[listKey]
+		print(("Lista '%s' agora está: %s"):format(listKey, tostring(activeLists[listKey])))
+		updateToggleVisual()
+	end)
+	updateToggleVisual()
+	
+	return holder
+end
+
+
+-- Agora criamos os botões de forma manual, definindo a posição de cada um
+-- Isso elimina o risco de ordenação automática.
+local mainBtn = createTabButton("Main", nil, 10)
+tabButtons["Main"] = mainBtn
+
+local autofarmBtn = createTabButton("Autofarm", nil, 50)
+tabButtons["Autofarm"] = autofarmBtn
+
+
+local contentMain = Instance.new("Frame", mainContentArea)
+contentMain.Name = "MainContent"
+contentMain.Size = UDim2.new(1, 0, 1, 0)
+contentMain.BackgroundTransparency = 1
+contentMain.Visible = false
+tabContents["Main"] = contentMain
+
+local headerLabelMain = Instance.new("TextLabel", contentMain)
+headerLabelMain.Name = "HeaderLabel"
+headerLabelMain.Size = UDim2.new(1, -20, 0, 40)
+headerLabelMain.Text = "Main"
+headerLabelMain.Font = Enum.Font.SourceSansBold
+headerLabelMain.TextSize = 36
+headerLabelMain.TextColor3 = Color3.fromRGB(50, 50, 50)
+headerLabelMain.BackgroundTransparency = 1
+headerLabelMain.TextXAlignment = Enum.TextXAlignment.Left
+
+local contentAutofarm = Instance.new("Frame", mainContentArea)
+contentAutofarm.Name = "AutofarmContent"
+contentAutofarm.Size = UDim2.new(1, 0, 1, 0)
+contentAutofarm.BackgroundTransparency = 1
+contentAutofarm.Visible = false
+tabContents["Autofarm"] = contentAutofarm
+
+local autofarmWrapper = Instance.new("Frame", contentAutofarm)
+autofarmWrapper.Size = UDim2.new(1, 0, 1, 0)
+autofarmWrapper.BackgroundTransparency = 1
+
+local headerLabelAutofarm = Instance.new("TextLabel")
+headerLabelAutofarm.Name = "HeaderLabel"
+headerLabelAutofarm.Size = UDim2.new(1, -20, 0, 40)
+headerLabelAutofarm.Text = "Autofarm"
+headerLabelAutofarm.Font = Enum.Font.SourceSansBold
+headerLabelAutofarm.TextSize = 36
+headerLabelAutofarm.TextColor3 = Color3.fromRGB(50, 50, 50)
+headerLabelAutofarm.BackgroundTransparency = 1
+headerLabelAutofarm.TextXAlignment = Enum.TextXAlignment.Left
+
+local secretsToggle = createToggle("AutoFarm Secrets", "Secrets")
+local brainrotToggle = createToggle("AutoFarm BrainrotGods", "BrainrotGods")
+local testToggle = createToggle("AutoFarm Test", "Test")
+
+headerLabelAutofarm.Position = UDim2.new(0, 10, 0, 0)
+secretsToggle.Position = UDim2.new(0, 10, 0, 50)
+brainrotToggle.Position = UDim2.new(0, 10, 0, 100)
+testToggle.Position = UDim2.new(0, 10, 0, 150)
+
+headerLabelAutofarm.Parent = autofarmWrapper
+secretsToggle.Parent = autofarmWrapper
+brainrotToggle.Parent = autofarmWrapper
+testToggle.Parent = autofarmWrapper
+
+mainBtn.MouseButton1Click:Connect(function()
+	switchTab("Main")
+end)
+autofarmBtn.MouseButton1Click:Connect(function()
+	switchTab("Autofarm")
+end)
+
+switchTab("Main")
+
+--========================================================--
+-- Lógica de AutoFarm
+--========================================================--
+
+-- Esta é a função principal de farm.
+local function farmItem(itemName)
+	-- Procura o item no workspace com o nome especificado
+	local item = Workspace:FindFirstChild(itemName)
+
+	if item then
+		-- Teleporta o personagem para o item para 'farmar'
+		HumanoidRootPart.CFrame = CFrame.new(item.Position)
+		print("Farmando item: " .. itemName)
+		task.wait(1) -- Espera um pouco para simular a ação de farm
+	else
+		print("Item '" .. itemName .. "' não encontrado. Procurando novamente...")
+		task.wait(2) -- Espera antes de tentar novamente
+	end
+end
+
+--========================================================--
+-- ABRIR/FECHAR UI
+--========================================================--
+
+-- Nova função para alternar a visibilidade
+local function toggleMenuVisibility()
+	isVisible = not isVisible
+	mainFrame.Visible = isVisible
+end
+
+-- Conecta a nova função ao botão de minimizar e à tecla G
+minimizeButton.MouseButton1Click:Connect(toggleMenuVisibility)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+	if input.KeyCode == Enum.KeyCode.G and not gameProcessedEvent then
+		toggleMenuVisibility()
+	end
+end)
+
+print("UI de teste carregada. Pressione 'G' para abrir/fechar o menu.")
+
+--========================================================--
+-- Loop de Execução do Autofarm
+--========================================================--
+task.spawn(function()
+	while task.wait(0.1) do
+		for item, isEnabled in pairs(activeLists) do
+			if isEnabled then
+				farmItem(item)
+			end
+		end
+	end
+end)
