@@ -1,0 +1,449 @@
+--========================================================--
+-- Configurações iniciais
+--========================================================--
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local UserInputService = game:GetService("UserInputService")
+
+-- Listas
+local lists = {
+	Secrets = {
+		"La Vacca Saturno Saturnita",
+		"Karkerkar Kurkur",
+		"Chimpanzini Spiderini",
+		"Agarrini la Palini",
+		"Los Tralaleritos",
+		"Las Tralaleritas",
+		"Las Vaquitas Saturnitas",
+		"Graipuss Medussi",
+		"Chicleteira Bicicleteira",
+		"La Grande Combinasion",
+		"Los Combinasionas",
+		"Nuclearo Dinossauro",
+		"Los Hotspotsitos",
+		"Garama and Madundung",
+		"Dragon Cannelloni",
+		"Secret Lucky Block",
+		"Pot Hotspot",
+		"Esok Sekolah",
+	},
+	BrainrotGods = {
+		"Cocofanto Elefanto",
+		"Girafa Celestre",
+		"Gattatino Neonino",
+		"Matteo",
+		"Tralalero Tralala",
+		"Los Crocodillitos",
+		"Espresso Signora",
+		"Odin Din Din Dun",
+		"Statutino Libertino",
+		"Tukanno Bananno",
+		"Trenostruzzo Turbo 3000",
+		"Trippi Troppi Troppa Trippa",
+		"Ballerino Lololo",
+		"Los Tungtungtungcitos",
+		"Piccione Macchina",
+		"Brainrot God Lucky Block",
+		"Orcalero Orcala",
+	},
+	Test = { "Tung Tung Tung Sahur" },
+}
+local activeLists = { Secrets = false, BrainrotGods = false, Test = false }
+
+--========================================================--
+-- Funções auxiliares
+--========================================================--
+local function waitForCharacterParts(timeout)
+	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local ok = pcall(function()
+		char:WaitForChild("Humanoid", timeout)
+	end)
+	local ok2 = pcall(function()
+		char:WaitForChild("HumanoidRootPart", timeout)
+	end)
+	return char, (ok and char:FindFirstChildOfClass("Humanoid")), (ok2 and char:FindFirstChild("HumanoidRootPart"))
+end
+
+-- Detecta função nativa
+local firePromptFn
+if typeof(fireproximityprompt) == "function" then
+	firePromptFn = fireproximityprompt
+elseif typeof(fireProximityPrompt) == "function" then
+	firePromptFn = fireProximityPrompt
+end
+
+local function safeFirePrompt(prompt, holdTime)
+	holdTime = holdTime or 2
+	if not prompt or not prompt:IsA("ProximityPrompt") then
+		return false
+	end
+	if firePromptFn then
+		local ok, err = pcall(function()
+			firePromptFn(prompt, holdTime)
+		end)
+		if ok then
+			return true
+		end
+		warn("[safeFirePrompt] Nativo falhou:", err)
+	end
+	-- fallback
+	local ok, vim = pcall(function()
+		return game:GetService("VirtualInputManager")
+	end)
+	if ok and vim then
+		pcall(function()
+			vim:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+		end)
+		task.wait(holdTime)
+		pcall(function()
+			vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+		end)
+		return true
+	end
+	return false
+end
+
+local function acharPrompt(model)
+	for _, desc in ipairs(model:GetDescendants()) do
+		if desc:IsA("ProximityPrompt") then
+			return desc
+		end
+	end
+end
+
+local function acharParteAlvo(model)
+	local try = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("RootPart") or model.PrimaryPart
+	if try and try:IsA("BasePart") then
+		return try
+	end
+	for _, v in ipairs(model:GetDescendants()) do
+		if v:IsA("BasePart") then
+			return v
+		end
+	end
+end
+
+--========================================================--
+-- Lógica de seguir e interagir
+--========================================================--
+local function seguirEInteragirAteSumir(model, displayName)
+	local char, humanoid, hrp = waitForCharacterParts(5)
+	if not char or not humanoid or not hrp then
+		return
+	end
+
+	print(("[DEBUG] Iniciando follow no modelo: %s | DisplayName: %s"):format(model.Name, displayName))
+
+	local lastPrint, lastFireTime, tentativas = 0, 0, 0
+	local connection
+	connection = RunService.Heartbeat:Connect(function()
+		if not model or not model.Parent then
+			print("[DEBUG] Modelo removido — parando follow.")
+			connection:Disconnect()
+			return
+		end
+
+		local targetPart = acharParteAlvo(model)
+		if targetPart then
+			local dist = (hrp.Position - targetPart.Position).Magnitude
+			if tick() - lastPrint > 2 then
+				print(("[DEBUG] Distância do modelo: %.2f studs"):format(dist))
+				lastPrint = tick()
+			end
+			if dist > 2.2 then
+				pcall(function()
+					humanoid:MoveTo(targetPart.Position)
+				end)
+			end
+		end
+
+		local prompt = acharPrompt(model)
+		if prompt then
+			local promptPos
+			if prompt.Parent:IsA("BasePart") then
+				promptPos = prompt.Parent.Position
+			elseif prompt.Parent:IsA("Attachment") and prompt.Parent.Parent:IsA("BasePart") then
+				promptPos = prompt.Parent.Parent.Position
+			end
+			if promptPos and (hrp.Position - promptPos).Magnitude <= 10 then
+				if tentativas < 5 and tick() - lastFireTime >= 2 then
+					print(("[DEBUG] Disparando ProximityPrompt (%d/5)"):format(tentativas + 1))
+					safeFirePrompt(prompt, 2)
+					tentativas += 1
+					lastFireTime = tick()
+				elseif tentativas >= 5 then
+					print("[DEBUG] Limite de tentativas atingido — parando follow.")
+					connection:Disconnect()
+				end
+			end
+		else
+			print("[DEBUG] ProximityPrompt sumiu — parando follow.")
+			connection:Disconnect()
+		end
+	end)
+end
+
+--========================================================--
+-- UI Reconstruída com Cores e Layout Melhorados
+--========================================================--
+local isVisible = false
+local gui = Instance.new("ScreenGui")
+gui.Name = "FollowUI"
+gui.Parent = game:GetService("CoreGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 400, 0, 300) -- Tamanho fixo para melhor controle do layout
+mainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 31, 34)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = gui
+mainFrame.ClipsDescendants = true
+mainFrame.BackgroundTransparency = 0.1
+mainFrame.ZIndex = 2
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Visible = false
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 10)
+mainCorner.Parent = mainFrame
+
+local titleBar = Instance.new("Frame", mainFrame)
+titleBar.Size = UDim2.new(1, 0, 0, 45)
+titleBar.BackgroundColor3 = Color3.fromRGB(30, 31, 34)
+titleBar.BorderSizePixel = 0
+titleBar.BackgroundTransparency = 0.5
+titleBar.ZIndex = 3
+
+local titleLabel = Instance.new("TextLabel", titleBar)
+titleLabel.Size = UDim2.new(1, -20, 0.5, 0)
+titleLabel.Position = UDim2.new(0, 10, 0, 0)
+titleLabel.Text = "Cobra Hub"
+titleLabel.Font = Enum.Font.SourceSans
+titleLabel.TextSize = 18
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.BackgroundTransparency = 1
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local subTitleLabel = Instance.new("TextLabel", titleBar)
+subTitleLabel.Size = UDim2.new(1, -20, 0.5, 0)
+subTitleLabel.Position = UDim2.new(0, 10, 0.5, 0)
+subTitleLabel.Text = "Cobra Hub Team."
+subTitleLabel.Font = Enum.Font.SourceSans
+subTitleLabel.TextSize = 14
+subTitleLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+subTitleLabel.BackgroundTransparency = 1
+subTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local sidebarFrame = Instance.new("Frame", mainFrame)
+sidebarFrame.Size = UDim2.new(0, 120, 1, -45)
+sidebarFrame.Position = UDim2.new(0, 0, 0, 45)
+sidebarFrame.BackgroundColor3 = Color3.fromRGB(24, 25, 27)
+sidebarFrame.BorderSizePixel = 0
+sidebarFrame.ZIndex = 2
+
+local sidebarLayout = Instance.new("UIListLayout", sidebarFrame)
+sidebarLayout.Padding = UDim.new(0, 5)
+sidebarLayout.FillDirection = Enum.FillDirection.Vertical
+sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+sidebarLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+
+local sidebarPadding = Instance.new("UIPadding", sidebarFrame)
+sidebarPadding.PaddingTop = UDim.new(0, 10)
+
+local contentFrame = Instance.new("Frame", mainFrame)
+contentFrame.Size = UDim2.new(1, -120, 1, -45)
+contentFrame.Position = UDim2.new(0, 120, 0, 45)
+contentFrame.BackgroundColor3 = Color3.fromRGB(36, 38, 41)
+contentFrame.BorderSizePixel = 0
+
+local contentPadding = Instance.new("UIPadding", contentFrame)
+contentPadding.PaddingTop = UDim.new(0, 10)
+contentPadding.PaddingBottom = UDim.new(0, 10)
+contentPadding.PaddingLeft = UDim.new(0, 10)
+contentPadding.PaddingRight = UDim.new(0, 10)
+
+-- Abas
+local tabs = { "Autofarm", "Misc" }
+local tabButtons = {}
+
+-- Função para mudar aba
+local function switchTab(tabName)
+	for name, btn in pairs(tabButtons) do
+		btn.BackgroundColor3 = (name == tabName) and Color3.fromRGB(36, 38, 41) or Color3.fromRGB(24, 25, 27)
+	end
+	for _, child in pairs(contentFrame:GetChildren()) do
+		if child:IsA("Frame") and child.Name ~= "UIPadding" then
+			child.Visible = (child.Name == tabName)
+		end
+	end
+end
+
+-- Criar botões das abas
+for i, tabName in ipairs(tabs) do
+	local btn = Instance.new("Frame", sidebarFrame)
+	btn.Name = tabName .. "Button"
+	btn.Size = UDim2.new(1, -10, 0, 35)
+	btn.BackgroundColor3 = Color3.fromRGB(24, 25, 27)
+	btn.BorderSizePixel = 0
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
+
+	local btnText = Instance.new("TextLabel", btn)
+	btnText.Size = UDim2.new(1, -10, 1, 0)
+	btnText.Position = UDim2.new(0, 10, 0, 0)
+	btnText.Text = tabName
+	btnText.Font = Enum.Font.SourceSans
+	btnText.TextSize = 14
+	btnText.TextXAlignment = Enum.TextXAlignment.Left
+	btnText.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btnText.BackgroundTransparency = 1
+
+	local clickDetector = Instance.new("TextButton", btn)
+	clickDetector.Size = UDim2.new(1, 0, 1, 0)
+	clickDetector.BackgroundTransparency = 1
+	clickDetector.Text = ""
+	clickDetector.ZIndex = 4
+	clickDetector.MouseButton1Click:Connect(function()
+		switchTab(tabName)
+	end)
+
+	tabButtons[tabName] = btn
+end
+
+-- Conteúdo Autofarm
+local autofarmFrame = Instance.new("Frame", contentFrame)
+autofarmFrame.Size = UDim2.new(1, 0, 1, 0)
+autofarmFrame.BackgroundTransparency = 1
+autofarmFrame.Name = "Autofarm"
+
+local autofarmLayout = Instance.new("UIListLayout", autofarmFrame)
+autofarmLayout.Padding = UDim.new(0, 10)
+autofarmLayout.FillDirection = Enum.FillDirection.Vertical
+autofarmLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+autofarmLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+
+local header = Instance.new("TextLabel", autofarmFrame)
+header.Size = UDim2.new(1, 0, 0, 20)
+header.Text = "Autofarm Options"
+header.Font = Enum.Font.SourceSans
+header.TextSize = 16
+header.TextColor3 = Color3.fromRGB(255, 255, 255)
+header.BackgroundTransparency = 1
+header.TextXAlignment = Enum.TextXAlignment.Left
+
+local function createToggle(text, listKey)
+	local holder = Instance.new("Frame", autofarmFrame)
+	holder.Size = UDim2.new(1, 0, 0, 40)
+	holder.BackgroundColor3 = Color3.fromRGB(45, 47, 50) -- Fundo cinza claro
+	holder.BorderSizePixel = 0
+	Instance.new("UICorner", holder).CornerRadius = UDim.new(0, 5)
+
+	local padding = Instance.new("UIPadding", holder)
+	padding.PaddingLeft = UDim.new(0, 10)
+	padding.PaddingRight = UDim.new(0, 10)
+
+	local layout = Instance.new("UIListLayout", holder)
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	layout.VerticalAlignment = Enum.VerticalAlignment.Center
+	layout.Padding = UDim.new(0, 10)
+
+	local label = Instance.new("TextLabel", holder)
+	label.Size = UDim2.new(1, -60, 1, 0) -- Ajuste de tamanho para o texto não sobrepor
+	label.Text = text
+	label.Font = Enum.Font.SourceSans
+	label.TextSize = 14
+	label.TextColor3 = Color3.fromRGB(255, 255, 255)
+	label.BackgroundTransparency = 1
+	label.TextXAlignment = Enum.TextXAlignment.Left
+
+	local toggleBtn = Instance.new("TextButton", holder)
+	toggleBtn.Size = UDim2.new(0, 40, 0, 20)
+	toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	toggleBtn.BorderSizePixel = 0
+	toggleBtn.Text = ""
+	Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0.5, 0)
+
+	local toggleHandle = Instance.new("Frame", toggleBtn)
+	toggleHandle.Size = UDim2.new(0, 18, 0, 18)
+	toggleHandle.Position = UDim2.new(0, 1, 0, 1)
+	toggleHandle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	Instance.new("UICorner", toggleHandle).CornerRadius = UDim.new(0.5, 0)
+
+	local function updateToggleVisual()
+		if activeLists[listKey] then
+			toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+			toggleHandle:TweenPosition(UDim2.new(1, -19, 0.5, -9), "Out", "Sine", 0.2, true)
+		else
+			toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+			toggleHandle:TweenPosition(UDim2.new(0, 1, 0.5, -9), "Out", "Sine", 0.2, true)
+		end
+	end
+
+	toggleBtn.MouseButton1Click:Connect(function()
+		activeLists[listKey] = not activeLists[listKey]
+		updateToggleVisual()
+	end)
+
+	updateToggleVisual()
+end
+
+createToggle("AutoFarm Secrets", "Secrets")
+createToggle("AutoFarm BrainrotGods", "BrainrotGods")
+createToggle("AutoFarm Test", "Test")
+
+-- Aba Misc
+local miscFrame = Instance.new("Frame", contentFrame)
+miscFrame.Size = UDim2.new(1, 0, 1, 0)
+miscFrame.BackgroundTransparency = 1
+miscFrame.Name = "Misc"
+
+switchTab("Autofarm")
+
+-- Fechar e Abrir Menu com a tecla G
+UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+	if input.KeyCode == Enum.KeyCode.G and not gameProcessedEvent then
+		isVisible = not isVisible
+		mainFrame.Visible = isVisible
+	end
+end)
+
+--========================================================--
+-- Monitor de MovingAnimals
+--========================================================--
+local movingAnimals = Workspace:WaitForChild("MovingAnimals")
+movingAnimals.ChildAdded:Connect(function(model)
+	if not model:IsA("Model") then
+		return
+	end
+	task.wait(0.5)
+
+	local infoFolder = model:FindFirstChild("HumanoidRootPart") and model.HumanoidRootPart:FindFirstChild("Info")
+	if not infoFolder then
+		return
+	end
+
+	local displayLabel = infoFolder:FindFirstChild("DisplayName", true)
+	if not (displayLabel and displayLabel:IsA("TextLabel")) then
+		return
+	end
+	local txt = displayLabel.Text or ""
+	print(("[DEBUG] Modelo detectado: %s | DisplayName: %s"):format(model.Name, txt))
+
+	for listName, names in pairs(lists) do
+		if activeLists[listName] then
+			for _, name in ipairs(names) do
+				if txt == name then
+					task.spawn(function()
+						seguirEInteragirAteSumir(model, txt)
+					end)
+					return
+				end
+			end
+		end
+	end
+end)
+
+print("[Script] Pronto — use a UI para ativar listas e seguir modelos.")
