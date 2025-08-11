@@ -1,4 +1,4 @@
--- CÓDIGO DE TESTE DA UI - ESTILO JANELA
+-- CÓDIGO DE TESTE DA UI - ESTILO JANELA v1.1
 -- Este script foi adaptado para ser executado via Delta Executor.
 
 local Players = game:GetService("Players")
@@ -144,7 +144,8 @@ local function createTabButton(tabName, iconText, yOffset)
 	btn.Position = UDim2.new(0.5, 0, 0, yOffset)
 	btn.AnchorPoint = Vector2.new(0.5, 0)
 	btn.BackgroundColor3 = Color3.fromRGB(240, 240, 240)
-	btn.BackgroundTransparency = 1
+	-- CORREÇÃO: A linha abaixo foi removida ou setada para 0 para tornar o botão visível
+	-- btn.BackgroundTransparency = 1
 	btn.ZIndex = 3
 	btn.Text = ""
 
