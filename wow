@@ -376,7 +376,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
 	end
 end)
 
-print("UI de teste carregada. Pressione 'G' para abrir/fechar o menu.")
+print("UI de teste carregada. Pressione 'G' para abrir/fechar o menu. v1.1")
 
 --========================================================--
 -- Loop de Execução do Autofarm
