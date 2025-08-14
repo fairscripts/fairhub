@@ -1,0 +1,170 @@
+-- UI estilo pasta macOS - Fair Hub (versão modificada)
+-- Feito para rodar no Delta Executor
+
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+-- Remover se já existir
+if CoreGui:FindFirstChild("FairHubUI") then
+    CoreGui.FairHubUI:Destroy()
+end
+
+-- Criar ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "FairHubUI"
+gui.Parent = CoreGui
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- Sombra externa
+local shadow = Instance.new("ImageLabel")
+shadow.Name = "Shadow"
+shadow.Size = UDim2.new(0, 320, 0, 220)
+shadow.Position = UDim2.new(0.5, -160, 0.5, -110)
+shadow.BackgroundTransparency = 1
+shadow.Image = "rbxassetid://1316045217"
+shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+shadow.ImageTransparency = 0.4
+shadow.ScaleType = Enum.ScaleType.Slice
+shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+shadow.Parent = gui
+
+-- Janela principal
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 300, 0, 200)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -100)
+mainFrame.BackgroundColor3 = Color3.fromRGB(232, 247, 247) -- Cor base
+mainFrame.BackgroundTransparency = 0
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = gui
+mainFrame.Active = true
+mainFrame.Draggable = true
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
+
+-- Gradiente único
+local mainGradient = Instance.new("UIGradient", mainFrame)
+mainGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(232, 247, 247)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 237, 237)) -- ligeiro escurecimento
+}
+
+-- Barra lateral
+local sidebar = Instance.new("Frame")
+sidebar.Size = UDim2.new(0, 90, 1, 0)
+sidebar.BackgroundColor3 = Color3.fromRGB(232, 247, 247)
+sidebar.BackgroundTransparency = 0
+sidebar.BorderSizePixel = 0
+sidebar.Parent = mainFrame
+Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 8)
+
+local sidebarGradient = Instance.new("UIGradient", sidebar)
+sidebarGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(232, 247, 247)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 237, 237))
+}
+
+-- Barra de separação preta
+local separator = Instance.new("Frame")
+separator.Size = UDim2.new(0, 2, 1, 0)
+separator.Position = UDim2.new(0, 90, 0, 0)
+separator.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+separator.BorderSizePixel = 0
+separator.Parent = mainFrame
+
+-- Título "Fair Hub"
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -10, 0, 20)
+title.Position = UDim2.new(0, 5, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "Fair Hub"
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 16
+title.TextColor3 = Color3.fromRGB(0, 128, 128)
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = sidebar
+
+-- Botão Auto Farm
+local autoFarmBtn = Instance.new("TextButton")
+autoFarmBtn.Size = UDim2.new(1, -10, 0, 20)
+autoFarmBtn.Position = UDim2.new(0, 5, 0, 30)
+autoFarmBtn.BackgroundColor3 = Color3.fromRGB(150, 220, 220)
+autoFarmBtn.BackgroundTransparency = 0.1
+autoFarmBtn.Text = "Auto Farm"
+autoFarmBtn.Font = Enum.Font.SourceSans
+autoFarmBtn.TextSize = 14
+autoFarmBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+autoFarmBtn.BorderSizePixel = 0
+autoFarmBtn.Parent = sidebar
+Instance.new("UICorner", autoFarmBtn).CornerRadius = UDim.new(0, 4)
+
+-- Área principal
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1, -92, 1, 0)
+content.Position = UDim2.new(0, 92, 0, 0)
+content.BackgroundColor3 = Color3.fromRGB(232, 247, 247)
+content.BackgroundTransparency = 0
+content.BorderSizePixel = 0
+content.Parent = mainFrame
+Instance.new("UICorner", content).CornerRadius = UDim.new(0, 8)
+
+local contentGradient = Instance.new("UIGradient", content)
+contentGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(232, 247, 247)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 237, 237))
+}
+
+-- Botões estilo mac
+local topBar = Instance.new("Frame")
+topBar.Size = UDim2.new(0, 45, 0, 14)
+topBar.Position = UDim2.new(1, -55, 0, 5)
+topBar.BackgroundTransparency = 1
+topBar.Parent = mainFrame
+
+local colors = {
+    Color3.fromRGB(255, 95, 86),
+    Color3.fromRGB(255, 189, 46),
+    Color3.fromRGB(39, 201, 63)
+}
+
+for i, col in ipairs(colors) do
+    local dot = Instance.new("Frame")
+    dot.Size = UDim2.new(0, 10, 0, 10)
+    dot.Position = UDim2.new(0, (i - 1) * 15, 0, 0)
+    dot.BackgroundColor3 = col
+    dot.BorderSizePixel = 0
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+    dot.Parent = topBar
+
+    -- Adicionar função ao botão verde (destruir GUI)
+    if i == 3 then
+        dot.MouseButton1Click:Connect(function()
+            gui:Destroy()
+        end)
+        dot.Active = true
+        dot.Selectable = true
+        local clickDetector = Instance.new("TextButton")
+        clickDetector.Size = UDim2.new(1,0,1,0)
+        clickDetector.BackgroundTransparency = 1
+        clickDetector.Text = ""
+        clickDetector.Parent = dot
+        clickDetector.MouseButton1Click:Connect(function()
+            gui:Destroy()
+        end)
+    end
+end
+
+-- Função do botão Auto Farm
+autoFarmBtn.MouseButton1Click:Connect(function()
+    print("Auto Farm ativado!") -- Coloque o código aqui
+end)
+
+-- Sistema de abrir/fechar com tecla G
+local visible = true
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.G then
+        visible = not visible
+        mainFrame.Visible = visible
+        shadow.Visible = visible
+    end
+end)
