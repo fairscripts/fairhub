@@ -1,108 +1,199 @@
--- Exemplo de script para Delta Executor
--- NOTA: Este é um exemplo conceitual. A implementação exata dependerá da biblioteca de UI
--- que você está usando (se houver) ou das funções de desenho nativas do executor.
--- A maioria dos executores fornece funções como `Drawing.new("Frame")` ou similares.
--- Se você tiver uma biblioteca de UI específica, por favor me avise.
+-- Cores em formato Color3 para o Roblox/Lua
+local MAIN_COLOR = Color3.fromHex("E8F7F7")
+local UI_BACKGROUND = Color3.new(0.12, 0.12, 0.12) -- Cor de fundo da janela principal
+local TOPBAR_COLOR = Color3.new(0.15, 0.15, 0.15) -- Cor da barra superior (amarelo na imagem)
+local SIDEBAR_COLOR = Color3.new(0.09, 0.09, 0.09) -- Cor da barra lateral (vermelho na imagem)
+local CONTENT_COLOR = Color3.new(0.08, 0.08, 0.08) -- Cor da área de conteúdo (verde na imagem)
+local BORDER_COLOR = Color3.new(0.1, 0.1, 0.1) -- Cor da borda
+local HOVER_COLOR = Color3.new(0.2, 0.2, 0.2) -- Cor ao passar o mouse
+local TEXT_COLOR = MAIN_COLOR
 
--- Cores
-local backgroundColor = Color3.new(0.15, 0.15, 0.15) -- Fundo da janela (exemplo)
-local mainColor = Color3.fromHex("E8F7F7")
+-- Posição e tamanho iniciais da janela
+local windowPos = Vector2.new(500, 300)
+local windowSize = Vector2.new(600, 400)
 
--- Criação da janela principal
--- (Este é um pseudocódigo, pois as funções exatas dependem do executor)
-local window = Drawing.new("Frame")
-window.Size = Vector2.new(500, 350)
-window.Position = Vector2.new(200, 200)
-window.BackgroundColor = backgroundColor
-window.Outline = true
-window.OutlineColor = Color3.new(0, 0, 0) -- Cor do contorno
+-- Variáveis de estado da UI
+local isVisible = true
+local isDragging = false
+local dragOffset = Vector2.new(0, 0)
+local currentTab = "Main"
 
--- Barra superior (Amarelo)
+-- Crie um Frame para a janela principal
+local mainFrame = Drawing.new("Frame")
+mainFrame.Visible = isVisible
+mainFrame.Color = UI_BACKGROUND
+mainFrame.Size = windowSize
+mainFrame.Position = windowPos
+mainFrame.Outline = true
+mainFrame.OutlineColor = BORDER_COLOR
+mainFrame.ZIndex = 1
+
+-- Cria a barra superior (Amarelo na imagem)
 local topBar = Drawing.new("Frame")
-topBar.Parent = window
-topBar.Size = Vector2.new(window.Size.X, 30)
+topBar.Parent = mainFrame
+topBar.Size = Vector2.new(windowSize.X, 30)
 topBar.Position = Vector2.new(0, 0)
-topBar.BackgroundColor = Color3.new(0.2, 0.2, 0.2)
--- Adicionar botões de fechar, minimizar, etc. aqui.
--- Implementar a funcionalidade de arrastar.
+topBar.Color = TOPBAR_COLOR
+topBar.Outline = false
 
--- Sidebar de seleção (Vermelho)
-local sidebar = Drawing.new("Frame")
-sidebar.Parent = window
-sidebar.Size = Vector2.new(120, window.Size.Y - 30)
-sidebar.Position = Vector2.new(0, 30)
-sidebar.BackgroundColor = Color3.new(0.1, 0.1, 0.1)
+-- Texto "FairHub"
+local titleText = Drawing.new("Text")
+titleText.Parent = topBar
+titleText.Text = "FairHub"
+titleText.Size = Vector2.new(100, 20)
+titleText.Position = Vector2.new(10, 5)
+titleText.Color = Color3.fromHex("00BFFF") -- Cor ciano
+titleText.Font = 1 -- Fonte padrão
+titleText.ZIndex = 2
+titleText.Outline = true
+titleText.OutlineColor = Color3.new(0,0,0)
 
--- Painel de conteúdo (Verde)
-local contentPanel = Drawing.new("Frame")
-contentPanel.Parent = window
-contentPanel.Size = Vector2.new(window.Size.X - 120, window.Size.Y - 30)
-contentPanel.Position = Vector2.new(120, 30)
-contentPanel.BackgroundColor = Color3.new(0.05, 0.05, 0.05)
+-- Botões da barra superior
+local closeButton = Drawing.new("Text")
+closeButton.Parent = topBar
+closeButton.Text = "X"
+closeButton.Size = Vector2.new(20, 20)
+closeButton.Position = Vector2.new(windowSize.X - 25, 5)
+closeButton.Color = Color3.new(1, 0.3, 0.3) -- Vermelho
+closeButton.Font = 1
+closeButton.TextXAlignment = 1
+closeButton.TextYAlignment = 1
+closeButton.ZIndex = 2
+closeButton.Outline = true
+closeButton.OutlineColor = Color3.new(0,0,0)
+
+local minimizeButton = Drawing.new("Text")
+minimizeButton.Parent = topBar
+minimizeButton.Text = "—"
+minimizeButton.Size = Vector2.new(20, 20)
+minimizeButton.Position = Vector2.new(windowSize.X - 50, 5)
+minimizeButton.Color = Color3.new(0.3, 1, 0.3) -- Verde
+minimizeButton.Font = 1
+minimizeButton.TextXAlignment = 1
+minimizeButton.TextYAlignment = 1
+minimizeButton.ZIndex = 2
+minimizeButton.Outline = true
+minimizeButton.OutlineColor = Color3.new(0,0,0)
+
+-- Area de seleção (vermelho na imagem)
+local sideBar = Drawing.new("Frame")
+sideBar.Parent = mainFrame
+sideBar.Size = Vector2.new(150, windowSize.Y - 30)
+sideBar.Position = Vector2.new(0, 30)
+sideBar.Color = SIDEBAR_COLOR
+sideBar.Outline = true
+sideBar.OutlineColor = BORDER_COLOR
+sideBar.ZIndex = 2
+
+-- Area de conteúdo (verde na imagem)
+local contentArea = Drawing.new("Frame")
+contentArea.Parent = mainFrame
+contentArea.Size = Vector2.new(windowSize.X - 150, windowSize.Y - 30)
+contentArea.Position = Vector2.new(150, 30)
+contentArea.Color = CONTENT_COLOR
+contentArea.Outline = true
+contentArea.OutlineColor = BORDER_COLOR
+contentArea.ZIndex = 2
+
+-- Crie os frames de conteúdo para cada aba
+local mainContentFrame = Drawing.new("Frame")
+mainContentFrame.Parent = contentArea
+mainContentFrame.Size = contentArea.Size
+mainContentFrame.Position = Vector2.new(0,0)
+mainContentFrame.Color = CONTENT_COLOR
+mainContentFrame.Visible = true
+
+local autofarmContentFrame = Drawing.new("Frame")
+autofarmContentFrame.Parent = contentArea
+autofarmContentFrame.Size = contentArea.Size
+autofarmContentFrame.Position = Vector2.new(0,0)
+autofarmContentFrame.Color = CONTENT_COLOR
+autofarmContentFrame.Visible = false
 
 -- Abas selecionáveis
 local tabs = {}
-local currentTab = nil
+local tabButtons = {}
 
--- Função para criar um botão de aba
-function createTabButton(name, position)
-    local button = Drawing.new("Text")
-    button.Parent = sidebar
-    button.Size = Vector2.new(120, 30)
-    button.Position = Vector2.new(0, position)
-    button.Text = name
-    button.Color = mainColor
-    button.Font = 1 -- Exemplo de fonte
-    button.TextYAlignment = 1 -- Centralizado na vertical
-    button.TextXAlignment = 1 -- Centralizado na horizontal
+function createTab(name, yPos, contentFrame)
+    local buttonFrame = Drawing.new("Frame")
+    buttonFrame.Parent = sideBar
+    buttonFrame.Size = Vector2.new(150, 40)
+    buttonFrame.Position = Vector2.new(0, yPos)
+    buttonFrame.Color = SIDEBAR_COLOR
+    buttonFrame.ZIndex = 3
 
-    -- Ao clicar, exibir o conteúdo correspondente
-    button.Click = function()
-        if currentTab then
-            tabs[currentTab].Content.Visible = false
-            tabs[currentTab].Button.Color = mainColor
-        end
-        currentTab = name
-        tabs[currentTab].Content.Visible = true
-        tabs[currentTab].Button.Color = Color3.new(1, 1, 1) -- Destacar a aba selecionada
-    end
+    local buttonText = Drawing.new("Text")
+    buttonText.Parent = buttonFrame
+    buttonText.Text = name
+    buttonText.Position = Vector2.new(5, 5)
+    buttonText.Color = TEXT_COLOR
+    buttonText.Font = 1
+    buttonText.Size = Vector2.new(140, 30)
+    buttonText.TextXAlignment = 0
+    buttonText.TextYAlignment = 1
 
-    return button
+    table.insert(tabs, {
+        name = name,
+        buttonFrame = buttonFrame,
+        contentFrame = contentFrame
+    })
+    tabButtons[name] = buttonFrame
 end
 
--- Painel de conteúdo da aba "Main"
-local mainContent = Drawing.new("Frame")
-mainContent.Parent = contentPanel
-mainContent.Visible = true -- Início visível
-mainContent.Size = contentPanel.Size
-mainContent.Position = Vector2.new(0, 0)
-mainContent.BackgroundColor = Color3.new(0.05, 0.05, 0.05)
--- Adicione elementos de UI para a aba Main aqui (ex: botões, toggles, etc.)
+createTab("Main", 40, mainContentFrame)
+createTab("Autofarm", 80, autofarmContentFrame)
 
--- Painel de conteúdo da aba "Autofarm"
-local autofarmContent = Drawing.new("Frame")
-autofarmContent.Parent = contentPanel
-autofarmContent.Visible = false -- Início invisível
-autofarmContent.Size = contentPanel.Size
-autofarmContent.Position = Vector2.new(0, 0)
-autofarmContent.BackgroundColor = Color3.new(0.05, 0.05, 0.05)
--- Adicione elementos de UI para a aba Autofarm aqui
+-- Função para exibir o conteúdo da aba correta
+local function showTab(tabName)
+    for _, tab in ipairs(tabs) do
+        tab.contentFrame.Visible = (tab.name == tabName)
+        tab.buttonFrame.Color = (tab.name == tabName) and HOVER_COLOR or SIDEBAR_COLOR
+    end
+end
 
--- Crie os botões de aba e associe-os aos painéis de conteúdo
-tabs["Main"] = {
-    Button = createTabButton("Main", 0),
-    Content = mainContent
-}
+-- Mostra a aba inicial
+showTab(currentTab)
 
-tabs["Autofarm"] = {
-    Button = createTabButton("Autofarm", 30),
-    Content = autofarmContent
-}
+-- Eventos de clique para as abas
+for _, tab in ipairs(tabs) do
+    tab.buttonFrame.Click = function()
+        currentTab = tab.name
+        showTab(currentTab)
+    end
+end
 
-currentTab = "Main" -- Define a aba inicial
+-- Funcionalidade de Arrastar
+topBar.MouseButton1Down = function()
+    isDragging = true
+    dragOffset = game.Players.LocalPlayer:GetMouse().Position - windowPos
+end
 
--- Implementação da janela principal e sua funcionalidade:
--- - Botão de fechar (vermelho): Destrói a janela. `window.Visible = false` ou `window:Destroy()`
--- - Botão de minimizar (verde): Esconde a janela. `window.Visible = false`
--- - Evento de teclado 'G': Alterna a visibilidade da janela. `window.Visible = not window.Visible`
--- - Arrastar a janela: Precisa de um loop `Mouse.Move` para atualizar a posição.
+game:GetService("UserInputService").MouseMoved:Connect(function(input)
+    if isDragging then
+        windowPos = input.Position - dragOffset
+        mainFrame.Position = windowPos
+    end
+end)
+
+topBar.MouseButton1Up = function()
+    isDragging = false
+end
+
+-- Botões de controle da janela
+closeButton.Click = function()
+    mainFrame.Visible = false
+    mainFrame:Destroy()
+end
+
+minimizeButton.Click = function()
+    isVisible = false
+    mainFrame.Visible = false
+end
+
+-- Ativação por tecla 'G'
+game:GetService("UserInputService").InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.G then
+        isVisible = not isVisible
+        mainFrame.Visible = isVisible
+    end
+end)
