@@ -1,0 +1,291 @@
+-- Localiza os serviços necessários
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+-- Obtém o player local
+local LocalPlayer = Players.LocalPlayer
+
+-- Cores (usando a cor principal especificada)
+local MAIN_COLOR = Color3.fromHex("E8F7F7")
+local UI_BACKGROUND = Color3.new(0.18, 0.18, 0.18) -- Cor de fundo geral mais escura como na imagem
+local TOPBAR_COLOR = Color3.new(0.15, 0.15, 0.15) -- Cor da barra superior
+local SIDEBAR_COLOR = Color3.new(0.1, 0.1, 0.1) -- Cor da barra lateral
+local CONTENT_COLOR = Color3.new(0.15, 0.15, 0.15) -- Cor da área de conteúdo
+local ACCENT_COLOR = Color3.fromHex("00BFFF") -- Cor ciano para "FairHub"
+local BUTTON_HOVER_COLOR = Color3.new(0.25, 0.25, 0.25)
+
+-- Cria o ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "FairHubGUI"
+gui.Parent = CoreGui
+gui.DisplayOrder = 10 -- Garante que fique na frente de outros elementos
+
+-- Cria a janela principal (com bordas arredondadas)
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 600, 0, 400)
+mainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
+mainFrame.BackgroundColor3 = UI_BACKGROUND
+mainFrame.BorderColor3 = Color3.new(0, 0, 0)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = false
+mainFrame.Parent = gui
+
+local mainFrameCorners = Instance.new("UICorner")
+mainFrameCorners.CornerRadius = UDim.new(0, 8)
+mainFrameCorners.Parent = mainFrame
+
+-- Cria a barra superior (Amarelo na imagem, com bordas arredondadas nas extremidades)
+local topBar = Instance.new("Frame")
+topBar.Name = "TopBar"
+topBar.Size = UDim2.new(1, 0, 0, 30)
+topBar.Position = UDim2.new(0, 0, 0, 0)
+topBar.BackgroundColor3 = TOPBAR_COLOR
+topBar.BorderColor3 = Color3.new(0, 0, 0)
+topBar.BorderSizePixel = 0
+topBar.Parent = mainFrame
+
+-- "FairHub" em um retângulo ciano arredondado
+local fairHubContainer = Instance.new("Frame")
+fairHubContainer.Name = "FairHubContainer"
+fairHubContainer.Size = UDim2.new(0, 120, 0, 24)
+fairHubContainer.Position = UDim2.new(0, 10, 0, 3)
+fairHubContainer.BackgroundColor3 = ACCENT_COLOR
+fairHubContainer.BorderColor3 = Color3.new(0, 0, 0)
+fairHubContainer.BorderSizePixel = 0
+fairHubContainer.Parent = topBar
+
+local fairHubCorners = Instance.new("UICorner")
+fairHubCorners.CornerRadius = UDim.new(0, 5)
+fairHubCorners.Parent = fairHubContainer
+
+local fairHubLabel = Instance.new("TextLabel")
+fairHubLabel.Name = "FairHubLabel"
+fairHubLabel.Text = "FairHub"
+fairHubLabel.Size = UDim2.new(1, 0, 1, 0)
+fairHubLabel.BackgroundTransparency = 1
+fairHubLabel.TextColor3 = MAIN_COLOR
+fairHubLabel.Font = Enum.Font.SourceSansBold
+fairHubLabel.TextScaled = true
+fairHubLabel.TextXAlignment = Enum.TextXAlignment.Center
+fairHubLabel.TextYAlignment = Enum.TextYAlignment.Center
+fairHubLabel.Parent = fairHubContainer
+
+-- Botões de controle (Esquerda na barra superior)
+local buttonSize = UDim2.new(0, 20, 0, 20)
+local buttonPadding = 5
+
+-- Botão de fechar (Vermelho)
+local closeButton = Instance.new("TextButton")
+closeButton.Name = "CloseButton"
+closeButton.Text = "●"
+closeButton.Font = Enum.Font.SourceSansBold
+closeButton.TextScaled = true
+closeButton.TextColor3 = Color3.new(1, 0.3, 0.3)
+closeButton.BackgroundColor3 = TOPBAR_COLOR
+closeButton.BorderColor3 = Color3.new(0, 0, 0)
+closeButton.BorderSizePixel = 0
+closeButton.Size = buttonSize
+closeButton.Position = UDim2.new(1, - (buttonSize.X.Offset + buttonPadding), 0, (topBar.Size.Y.Offset - buttonSize.Y.Offset) / 2)
+closeButton.Parent = topBar
+closeButton.MouseButton1Click:Connect(function()
+    gui:Destroy()
+end)
+closeButton.MouseEnter:Connect(function() closeButton.BackgroundColor3 = BUTTON_HOVER_COLOR end)
+closeButton.MouseLeave:Connect(function() closeButton.BackgroundColor3 = TOPBAR_COLOR end)
+
+-- Botão de minimizar (Amarelo na imagem - vou usar tom de amarelo)
+local minimizeButton = Instance.new("TextButton")
+minimizeButton.Name = "MinimizeButton"
+minimizeButton.Text = "●"
+minimizeButton.Font = Enum.Font.SourceSansBold
+minimizeButton.TextScaled = true
+minimizeButton.TextColor3 = Color3.new(1, 1, 0.3)
+minimizeButton.BackgroundColor3 = TOPBAR_COLOR
+minimizeButton.BorderColor3 = Color3.new(0, 0, 0)
+minimizeButton.BorderSizePixel = 0
+minimizeButton.Size = buttonSize
+minimizeButton.Position = UDim2.new(1, - (2 * buttonSize.X.Offset + 2 * buttonPadding), 0, (topBar.Size.Y.Offset - buttonSize.Y.Offset) / 2)
+minimizeButton.Parent = topBar
+minimizeButton.MouseButton1Click:Connect(function()
+    mainFrame.Visible = not mainFrame.Visible
+end)
+minimizeButton.MouseEnter:Connect(function() minimizeButton.BackgroundColor3 = BUTTON_HOVER_COLOR end)
+minimizeButton.MouseLeave:Connect(function() minimizeButton.BackgroundColor3 = TOPBAR_COLOR end)
+
+-- Botão de maximizar (Verde) - Vou colocar, embora não tenha sido explicitamente pedido
+local maximizeButton = Instance.new("TextButton")
+maximizeButton.Name = "MaximizeButton"
+maximizeButton.Text = "●"
+maximizeButton.Font = Enum.Font.SourceSansBold
+maximizeButton.TextScaled = true
+maximizeButton.TextColor3 = Color3.new(0.3, 1, 0.3)
+maximizeButton.BackgroundColor3 = TOPBAR_COLOR
+maximizeButton.BorderColor3 = Color3.new(0, 0, 0)
+maximizeButton.BorderSizePixel = 0
+maximizeButton.Size = buttonSize
+maximizeButton.Position = UDim2.new(1, - (3 * buttonSize.X.Offset + 3 * buttonPadding), 0, (topBar.Size.Y.Offset - buttonSize.Y.Offset) / 2)
+maximizeButton.Parent = topBar
+-- Adicione funcionalidade de maximizar se necessário
+maximizeButton.MouseEnter:Connect(function() maximizeButton.BackgroundColor3 = BUTTON_HOVER_COLOR end)
+maximizeButton.MouseLeave:Connect(function() maximizeButton.BackgroundColor3 = TOPBAR_COLOR end)
+
+-- Sidebar de seleção (Vermelho na imagem)
+local sideBar = Instance.new("Frame")
+sideBar.Name = "SideBar"
+sideBar.Size = UDim2.new(0, 180, 1, -30)
+sideBar.Position = UDim2.new(0, 0, 0, 30)
+sideBar.BackgroundColor3 = SIDEBAR_COLOR
+sideBar.BorderColor3 = Color3.new(0, 0, 0)
+sideBar.BorderSizePixel = 0
+sideBar.Parent = mainFrame
+
+-- "Favoritos" Label
+local favoritesLabel = Instance.new("TextLabel")
+favoritesLabel.Name = "FavoritesLabel"
+favoritesLabel.Text = "Favoritos"
+favoritesLabel.Size = UDim2.new(1, 0, 0, 20)
+favoritesLabel.Position = UDim2.new(0, 0, 0, 5)
+favoritesLabel.BackgroundTransparency = 1
+favoritesLabel.TextColor3 = MAIN_COLOR:Lerp(Color3.new(1, 1, 1), 0.6) -- Tom mais claro
+favoritesLabel.Font = Enum.Font.SourceSansBold
+favoritesLabel.TextSize = 14
+favoritesLabel.TextXAlignment = Enum.TextXAlignment.Left
+favoritesLabel.TextYAlignment = Enum.TextYAlignment.Center
+favoritesLabel.Parent = sideBar
+favoritesLabel.TextXInset = 10
+
+-- "Downloads" (Exemplo de item selecionável)
+local downloadsButton = Instance.new("TextButton")
+downloadsButton.Name = "DownloadsButton"
+downloadsButton.Text = "Downloads"
+downloadsButton.Size = UDim2.new(1, 0, 0, 30)
+downloadsButton.Position = UDim2.new(0, 0, 0, 30)
+downloadsButton.BackgroundColor3 = TOPBAR_COLOR -- Cor de fundo mais clara para indicar seleção (como na imagem)
+downloadsButton.BorderColor3 = Color3.new(0, 0, 0)
+downloadsButton.BorderSizePixel = 0
+downloadsButton.Font = Enum.Font.SourceSansBold
+downloadsButton.TextColor3 = MAIN_COLOR
+downloadsButton.TextSize = 16
+downloadsButton.TextXAlignment = Enum.TextXAlignment.Left
+downloadsButton.TextYAlignment = Enum.TextYAlignment.Center
+downloadsButton.Parent = sideBar
+downloadsButton.TextXInset = 10
+-- Adicionar ícone aqui se tiver um
+
+-- Área de conteúdo (Verde na imagem)
+local contentArea = Instance.new("Frame")
+contentArea.Name = "ContentArea"
+contentArea.Size = UDim2.new(1, -180, 1, -30)
+contentArea.Position = UDim2.new(0, 180, 0, 30)
+contentArea.BackgroundColor3 = CONTENT_COLOR
+contentArea.BorderColor3 = Color3.new(0, 0, 0)
+contentArea.BorderSizePixel = 0
+contentArea.Parent = mainFrame
+
+-- Conteúdo das abas
+local mainContent = Instance.new("Frame")
+mainContent.Name = "MainContent"
+mainContent.Size = UDim2.new(1, 0, 1, 0)
+mainContent.BackgroundTransparency = 1
+mainContent.Parent = contentArea
+-- Adicione conteúdo da aba "Main" aqui
+
+local autofarmContent = Instance.new("Frame")
+autofarmContent.Name = "AutofarmContent"
+autofarmContent.Size = UDim2.new(1, 0, 1, 0)
+autofarmContent.BackgroundTransparency = 1
+autofarmContent.Parent = contentArea
+autofarmContent.Visible = false
+-- Adicione conteúdo da aba "Autofarm" aqui
+
+-- Abas "Main" e "Autofarm"
+local tabHeight = 30
+local tabYOffset = downloadsButton.Position.Y.Offset + downloadsButton.Size.Y.Offset + 10 -- Espaçamento
+
+local mainTabButton = Instance.new("TextButton")
+mainTabButton.Name = "MainTab"
+mainTabButton.Text = "Main"
+mainTabButton.Size = UDim2.new(1, 0, 0, tabHeight)
+mainTabButton.Position = UDim2.new(0, 0, 0, tabYOffset)
+mainTabButton.BackgroundColor3 = SIDEBAR_COLOR
+mainTabButton.BorderColor3 = Color3.new(0, 0, 0)
+mainTabButton.BorderSizePixel = 0
+mainTabButton.Font = Enum.Font.SourceSansBold
+mainTabButton.TextColor3 = MAIN_COLOR
+mainTabButton.TextSize = 16
+mainTabButton.TextXAlignment = Enum.TextXAlignment.Left
+mainTabButton.TextYAlignment = Enum.TextYAlignment.Center
+mainTabButton.TextXInset = 10
+mainTabButton.Parent = sideBar
+mainTabButton.MouseButton1Click:Connect(function()
+    mainContent.Visible = true
+    autofarmContent.Visible = false
+    downloadsButton.BackgroundColor3 = SIDEBAR_COLOR -- Deseleciona "Downloads" visualmente
+    mainTabButton.BackgroundColor3 = TOPBAR_COLOR -- Seleciona "Main" visualmente
+    autofarmTabButton.BackgroundColor3 = SIDEBAR_COLOR -- Deseleciona "Autofarm" visualmente
+end)
+mainTabButton.MouseEnter:Connect(function() if mainContent.Visible == false then mainTabButton.BackgroundColor3 = BUTTON_HOVER_COLOR end end)
+mainTabButton.MouseLeave:Connect(function() if mainContent.Visible == false then mainTabButton.BackgroundColor3 = SIDEBAR_COLOR end end)
+
+local autofarmTabButton = Instance.new("TextButton")
+autofarmTabButton.Name = "AutofarmTab"
+autofarmTabButton.Text = "Autofarm"
+autofarmTabButton.Size = UDim2.new(1, 0, 0, tabHeight)
+autofarmTabButton.Position = UDim2.new(0, 0, 0, tabYOffset + tabHeight)
+autofarmTabButton.BackgroundColor3 = SIDEBAR_COLOR
+autofarmTabButton.BorderColor3 = Color3.new(0, 0, 0)
+autofarmTabButton.BorderSizePixel = 0
+autofarmTabButton.Font = Enum.Font.SourceSansBold
+autofarmTabButton.TextColor3 = MAIN_COLOR
+autofarmTabButton.TextSize = 16
+autofarmTabButton.TextXAlignment = Enum.TextXAlignment.Left
+autofarmTabButton.TextYAlignment = Enum.TextYAlignment.Center
+autofarmTabButton.TextXInset = 10
+autofarmTabButton.Parent = sideBar
+autofarmTabButton.MouseButton1Click:Connect(function()
+    mainContent.Visible = false
+    autofarmContent.Visible = true
+    downloadsButton.BackgroundColor3 = SIDEBAR_COLOR -- Deseleciona "Downloads" visualmente
+    mainTabButton.BackgroundColor3 = SIDEBAR_COLOR -- Deseleciona "Main" visualmente
+    autofarmTabButton.BackgroundColor3 = TOPBAR_COLOR -- Seleciona "Autofarm" visualmente
+end)
+autofarmTabButton.MouseEnter:Connect(function() if autofarmContent.Visible == false then autofarmTabButton.BackgroundColor3 = BUTTON_HOVER_COLOR end end)
+autofarmTabButton.MouseLeave:Connect(function() if autofarmContent.Visible == false then autofarmTabButton.BackgroundColor3 = SIDEBAR_COLOR end end)
+
+-- Inicialmente, selecione a aba "Main" visualmente
+mainTabButton.BackgroundColor3 = TOPBAR_COLOR
+
+-- Funcionalidade de arrastar
+local dragging = false
+local dragOffset = Vector2.new()
+
+topBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragOffset = input.Position - Vector2.new(mainFrame.AbsolutePosition.X, mainFrame.AbsolutePosition.Y)
+        topBar.ZIndex = 2
+    end
+end)
+
+topBar.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+        topBar.ZIndex = 1
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        mainFrame.Position = UDim2.new(0, input.Position.X - dragOffset.X, 0, input.Position.Y - dragOffset.Y)
+    end
+end)
+
+-- Tecla de atalho 'G' para minimizar/mostrar
+UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+    if not gameProcessedEvent and input.KeyCode == Enum.KeyCode.G then
+        mainFrame.Visible = not mainFrame.Visible
+    end
+end)
