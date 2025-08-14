@@ -1,73 +1,69 @@
--- Script para CoreGUI
+-- Script para CoreGUI, compatível com Delta Executor
+-- NOTA: O CoreGUI requer a criação de objetos usando Instance.new()
 
--- Inicializa a UI
+-- Acessa o serviço CoreGui
 local CoreGUI = game:GetService("CoreGui")
 
--- Cria a janela principal
-local main_frame = CoreGUI.NewFrame({
-    Name = "macOS_Folder",
-    Size = UDim2.new(0.6, 0, 0.7, 0), -- Ajuste o tamanho conforme necessário
-    Position = UDim2.new(0.5, 0, 0.5, 0),
-    AnchorPoint = Vector2.new(0.5, 0.5),
-    BackgroundColor3 = Color3.new(0.15, 0.15, 0.15), -- Cor de fundo escura
-    BorderSizePixel = 0,
-    Draggable = true, -- Permite arrastar a janela
-})
+-- Cria a janela principal da UI
+local main_frame = Instance.new("Frame")
+main_frame.Name = "macOS_Folder"
+main_frame.Parent = CoreGUI
+main_frame.Size = UDim2.new(0.6, 0, 0.7, 0)
+main_frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+main_frame.AnchorPoint = Vector2.new(0.5, 0.5)
+main_frame.BackgroundColor3 = Color3.new(0.15, 0.15, 0.15)
+main_frame.BorderSizePixel = 0
+main_frame.Draggable = true
 
--- Cria o painel lateral (roxo)
-local left_panel = CoreGUI.NewFrame({
-    Name = "left_panel",
-    Parent = main_frame,
-    Size = UDim2.new(0.25, 0, 1, 0),
-    Position = UDim2.new(0, 0, 0, 0),
-    BackgroundColor3 = Color3.new(0.25, 0.05, 0.25), -- Cor roxa
-    BorderSizePixel = 0,
-})
+-- Cria o painel lateral roxo
+local left_panel = Instance.new("Frame")
+left_panel.Name = "left_panel"
+left_panel.Parent = main_frame
+left_panel.Size = UDim2.new(0.25, 0, 1, 0)
+left_panel.Position = UDim2.new(0, 0, 0, 0)
+left_panel.BackgroundColor3 = Color3.new(0.25, 0.05, 0.25)
+left_panel.BorderSizePixel = 0
 
--- Adiciona o título "fair hub" na parte superior do painel lateral
-local title_label = CoreGUI.NewTextLabel({
-    Name = "title_label",
-    Parent = left_panel,
-    Text = "fair hub",
-    Size = UDim2.new(1, 0, 0.1, 0),
-    Position = UDim2.new(0, 0, 0, 0),
-    BackgroundColor3 = Color3.new(0, 0, 1), -- Cor ciano para o fundo do texto
-    TextColor3 = Color3.new(1, 1, 1),
-    TextScaled = true,
-    Font = Enum.Font.SourceSansBold,
-    TextXAlignment = Enum.TextXAlignment.Left,
-    TextYAlignment = Enum.TextYAlignment.Center,
-    Padding = 10,
-})
+-- Adiciona o texto "fair hub" com fundo ciano
+local title_label = Instance.new("TextLabel")
+title_label.Name = "title_label"
+title_label.Parent = left_panel
+title_label.Text = "fair hub"
+title_label.Size = UDim2.new(1, 0, 0.1, 0)
+title_label.Position = UDim2.new(0, 0, 0, 0)
+title_label.BackgroundColor3 = Color3.new(0, 0.75, 1) -- Cor ciano
+title_label.TextColor3 = Color3.new(1, 1, 1)
+title_label.TextScaled = true
+title_label.Font = Enum.Font.SourceSansBold
+title_label.TextXAlignment = Enum.TextXAlignment.Left
+title_label.TextYAlignment = Enum.TextYAlignment.Center
+title_label.Padding = 10
 
--- Adiciona o botão "auto farm"
-local auto_farm_button = CoreGUI.NewTextButton({
-    Name = "auto_farm_button",
-    Parent = left_panel,
-    Text = "Auto Farm",
-    Size = UDim2.new(1, 0, 0.08, 0),
-    Position = UDim2.new(0, 0, 0.2, 0), -- Posição abaixo do título
-    BackgroundColor3 = Color3.new(0.3, 0.1, 0.3), -- Cor de fundo para o botão selecionado
-    TextColor3 = Color3.new(1, 1, 1),
-    TextScaled = true,
-    Font = Enum.Font.SourceSansBold,
-    TextXAlignment = Enum.TextXAlignment.Left,
-    TextYAlignment = Enum.TextYAlignment.Center,
-    Padding = 10,
-})
+-- Adiciona o botão "Auto Farm"
+local auto_farm_button = Instance.new("TextButton")
+auto_farm_button.Name = "auto_farm_button"
+auto_farm_button.Parent = left_panel
+auto_farm_button.Text = "Auto Farm"
+auto_farm_button.Size = UDim2.new(1, 0, 0.08, 0)
+auto_farm_button.Position = UDim2.new(0, 0, 0.2, 0)
+auto_farm_button.BackgroundColor3 = Color3.new(0.3, 0.1, 0.3)
+auto_farm_button.TextColor3 = Color3.new(1, 1, 1)
+auto_farm_button.TextScaled = true
+auto_farm_button.Font = Enum.Font.SourceSansBold
+auto_farm_button.TextXAlignment = Enum.TextXAlignment.Left
+auto_farm_button.TextYAlignment = Enum.TextYAlignment.Center
+auto_farm_button.Padding = 10
 
 -- Cria o painel principal de conteúdo
-local main_panel = CoreGUI.NewFrame({
-    Name = "main_panel",
-    Parent = main_frame,
-    Size = UDim2.new(0.75, 0, 1, 0),
-    Position = UDim2.new(0.25, 0, 0, 0),
-    BackgroundColor3 = Color3.new(0.1, 0.1, 0.1), -- Cor de fundo escura
-    BorderSizePixel = 0,
-})
+local main_panel = Instance.new("Frame")
+main_panel.Name = "main_panel"
+main_panel.Parent = main_frame
+main_panel.Size = UDim2.new(0.75, 0, 1, 0)
+main_panel.Position = UDim2.new(0.25, 0, 0, 0)
+main_panel.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+main_panel.BorderSizePixel = 0
 
--- Adicione a funcionalidade ao botão
+-- Conecta a funcionalidade ao botão "Auto Farm"
 auto_farm_button.MouseButton1Click:Connect(function()
-    print("Auto Farm ativado!")
-    -- Adicione aqui o código para o seu script de auto farm
+    print("Auto Farm ativado! Execute seu script de auto farm aqui.")
 end)
