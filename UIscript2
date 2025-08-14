@@ -1,0 +1,73 @@
+-- Script para CoreGUI
+
+-- Inicializa a UI
+local CoreGUI = game:GetService("CoreGui")
+
+-- Cria a janela principal
+local main_frame = CoreGUI.NewFrame({
+    Name = "macOS_Folder",
+    Size = UDim2.new(0.6, 0, 0.7, 0), -- Ajuste o tamanho conforme necessário
+    Position = UDim2.new(0.5, 0, 0.5, 0),
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    BackgroundColor3 = Color3.new(0.15, 0.15, 0.15), -- Cor de fundo escura
+    BorderSizePixel = 0,
+    Draggable = true, -- Permite arrastar a janela
+})
+
+-- Cria o painel lateral (roxo)
+local left_panel = CoreGUI.NewFrame({
+    Name = "left_panel",
+    Parent = main_frame,
+    Size = UDim2.new(0.25, 0, 1, 0),
+    Position = UDim2.new(0, 0, 0, 0),
+    BackgroundColor3 = Color3.new(0.25, 0.05, 0.25), -- Cor roxa
+    BorderSizePixel = 0,
+})
+
+-- Adiciona o título "fair hub" na parte superior do painel lateral
+local title_label = CoreGUI.NewTextLabel({
+    Name = "title_label",
+    Parent = left_panel,
+    Text = "fair hub",
+    Size = UDim2.new(1, 0, 0.1, 0),
+    Position = UDim2.new(0, 0, 0, 0),
+    BackgroundColor3 = Color3.new(0, 0, 1), -- Cor ciano para o fundo do texto
+    TextColor3 = Color3.new(1, 1, 1),
+    TextScaled = true,
+    Font = Enum.Font.SourceSansBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Center,
+    Padding = 10,
+})
+
+-- Adiciona o botão "auto farm"
+local auto_farm_button = CoreGUI.NewTextButton({
+    Name = "auto_farm_button",
+    Parent = left_panel,
+    Text = "Auto Farm",
+    Size = UDim2.new(1, 0, 0.08, 0),
+    Position = UDim2.new(0, 0, 0.2, 0), -- Posição abaixo do título
+    BackgroundColor3 = Color3.new(0.3, 0.1, 0.3), -- Cor de fundo para o botão selecionado
+    TextColor3 = Color3.new(1, 1, 1),
+    TextScaled = true,
+    Font = Enum.Font.SourceSansBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Center,
+    Padding = 10,
+})
+
+-- Cria o painel principal de conteúdo
+local main_panel = CoreGUI.NewFrame({
+    Name = "main_panel",
+    Parent = main_frame,
+    Size = UDim2.new(0.75, 0, 1, 0),
+    Position = UDim2.new(0.25, 0, 0, 0),
+    BackgroundColor3 = Color3.new(0.1, 0.1, 0.1), -- Cor de fundo escura
+    BorderSizePixel = 0,
+})
+
+-- Adicione a funcionalidade ao botão
+auto_farm_button.MouseButton1Click:Connect(function()
+    print("Auto Farm ativado!")
+    -- Adicione aqui o código para o seu script de auto farm
+end)
