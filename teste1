@@ -1,0 +1,108 @@
+-- Exemplo de script para Delta Executor
+-- NOTA: Este é um exemplo conceitual. A implementação exata dependerá da biblioteca de UI
+-- que você está usando (se houver) ou das funções de desenho nativas do executor.
+-- A maioria dos executores fornece funções como `Drawing.new("Frame")` ou similares.
+-- Se você tiver uma biblioteca de UI específica, por favor me avise.
+
+-- Cores
+local backgroundColor = Color3.new(0.15, 0.15, 0.15) -- Fundo da janela (exemplo)
+local mainColor = Color3.fromHex("E8F7F7")
+
+-- Criação da janela principal
+-- (Este é um pseudocódigo, pois as funções exatas dependem do executor)
+local window = Drawing.new("Frame")
+window.Size = Vector2.new(500, 350)
+window.Position = Vector2.new(200, 200)
+window.BackgroundColor = backgroundColor
+window.Outline = true
+window.OutlineColor = Color3.new(0, 0, 0) -- Cor do contorno
+
+-- Barra superior (Amarelo)
+local topBar = Drawing.new("Frame")
+topBar.Parent = window
+topBar.Size = Vector2.new(window.Size.X, 30)
+topBar.Position = Vector2.new(0, 0)
+topBar.BackgroundColor = Color3.new(0.2, 0.2, 0.2)
+-- Adicionar botões de fechar, minimizar, etc. aqui.
+-- Implementar a funcionalidade de arrastar.
+
+-- Sidebar de seleção (Vermelho)
+local sidebar = Drawing.new("Frame")
+sidebar.Parent = window
+sidebar.Size = Vector2.new(120, window.Size.Y - 30)
+sidebar.Position = Vector2.new(0, 30)
+sidebar.BackgroundColor = Color3.new(0.1, 0.1, 0.1)
+
+-- Painel de conteúdo (Verde)
+local contentPanel = Drawing.new("Frame")
+contentPanel.Parent = window
+contentPanel.Size = Vector2.new(window.Size.X - 120, window.Size.Y - 30)
+contentPanel.Position = Vector2.new(120, 30)
+contentPanel.BackgroundColor = Color3.new(0.05, 0.05, 0.05)
+
+-- Abas selecionáveis
+local tabs = {}
+local currentTab = nil
+
+-- Função para criar um botão de aba
+function createTabButton(name, position)
+    local button = Drawing.new("Text")
+    button.Parent = sidebar
+    button.Size = Vector2.new(120, 30)
+    button.Position = Vector2.new(0, position)
+    button.Text = name
+    button.Color = mainColor
+    button.Font = 1 -- Exemplo de fonte
+    button.TextYAlignment = 1 -- Centralizado na vertical
+    button.TextXAlignment = 1 -- Centralizado na horizontal
+
+    -- Ao clicar, exibir o conteúdo correspondente
+    button.Click = function()
+        if currentTab then
+            tabs[currentTab].Content.Visible = false
+            tabs[currentTab].Button.Color = mainColor
+        end
+        currentTab = name
+        tabs[currentTab].Content.Visible = true
+        tabs[currentTab].Button.Color = Color3.new(1, 1, 1) -- Destacar a aba selecionada
+    end
+
+    return button
+end
+
+-- Painel de conteúdo da aba "Main"
+local mainContent = Drawing.new("Frame")
+mainContent.Parent = contentPanel
+mainContent.Visible = true -- Início visível
+mainContent.Size = contentPanel.Size
+mainContent.Position = Vector2.new(0, 0)
+mainContent.BackgroundColor = Color3.new(0.05, 0.05, 0.05)
+-- Adicione elementos de UI para a aba Main aqui (ex: botões, toggles, etc.)
+
+-- Painel de conteúdo da aba "Autofarm"
+local autofarmContent = Drawing.new("Frame")
+autofarmContent.Parent = contentPanel
+autofarmContent.Visible = false -- Início invisível
+autofarmContent.Size = contentPanel.Size
+autofarmContent.Position = Vector2.new(0, 0)
+autofarmContent.BackgroundColor = Color3.new(0.05, 0.05, 0.05)
+-- Adicione elementos de UI para a aba Autofarm aqui
+
+-- Crie os botões de aba e associe-os aos painéis de conteúdo
+tabs["Main"] = {
+    Button = createTabButton("Main", 0),
+    Content = mainContent
+}
+
+tabs["Autofarm"] = {
+    Button = createTabButton("Autofarm", 30),
+    Content = autofarmContent
+}
+
+currentTab = "Main" -- Define a aba inicial
+
+-- Implementação da janela principal e sua funcionalidade:
+-- - Botão de fechar (vermelho): Destrói a janela. `window.Visible = false` ou `window:Destroy()`
+-- - Botão de minimizar (verde): Esconde a janela. `window.Visible = false`
+-- - Evento de teclado 'G': Alterna a visibilidade da janela. `window.Visible = not window.Visible`
+-- - Arrastar a janela: Precisa de um loop `Mouse.Move` para atualizar a posição.
