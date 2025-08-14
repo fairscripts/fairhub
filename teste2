@@ -1,0 +1,200 @@
+-- Localiza os serviços necessários
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+-- Obtém o player local
+local LocalPlayer = Players.LocalPlayer
+
+-- Cores
+local MAIN_COLOR = Color3.fromHex("E8F7F7")
+local UI_BACKGROUND = Color3.new(0.12, 0.12, 0.12)
+local TOPBAR_COLOR = Color3.new(0.15, 0.15, 0.15)
+local SIDEBAR_COLOR = Color3.new(0.09, 0.09, 0.09)
+local CONTENT_COLOR = Color3.new(0.08, 0.08, 0.08)
+local BORDER_COLOR = Color3.new(0.1, 0.1, 0.1)
+
+-- Cria o ScreenGui que contém toda a UI
+local gui = Instance.new("ScreenGui")
+gui.Name = "FairHubGUI"
+gui.Enabled = true
+gui.Parent = CoreGui -- Define CoreGui como pai
+
+-- Cria o Frame principal (Janela)
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 600, 0, 400)
+mainFrame.Position = UDim2.new(0.5, -300, 0.5, -200) -- Centraliza na tela
+mainFrame.BackgroundColor3 = UI_BACKGROUND
+mainFrame.BorderColor3 = BORDER_COLOR
+mainFrame.Active = true -- Essencial para arrastar
+mainFrame.Draggable = false -- Faremos o arrastar manualmente
+mainFrame.Parent = gui
+
+-- Adiciona o Topbar (Amarelo na imagem)
+local topBar = Instance.new("Frame")
+topBar.Name = "TopBar"
+topBar.Size = UDim2.new(1, 0, 0, 30)
+topBar.Position = UDim2.new(0, 0, 0, 0)
+topBar.BackgroundColor3 = TOPBAR_COLOR
+topBar.BorderColor3 = BORDER_COLOR
+topBar.Parent = mainFrame
+
+-- Adiciona o título "FairHub" (Ciano)
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Name = "Title"
+titleLabel.Text = "FairHub"
+titleLabel.Size = UDim2.new(0, 150, 1, 0)
+titleLabel.Position = UDim2.new(0, 10, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.TextColor3 = Color3.fromHex("00BFFF")
+titleLabel.Font = Enum.Font.SourceSans
+titleLabel.TextScaled = true
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = topBar
+
+-- Botão de fechar (Vermelho)
+local closeButton = Instance.new("TextButton")
+closeButton.Name = "CloseButton"
+closeButton.Text = "X"
+closeButton.Size = UDim2.new(0, 25, 0, 25)
+closeButton.Position = UDim2.new(1, -30, 0, 2)
+closeButton.BackgroundColor3 = Color3.new(1, 0.3, 0.3)
+closeButton.Font = Enum.Font.SourceSans
+closeButton.TextColor3 = Color3.new(0, 0, 0)
+closeButton.Parent = topBar
+
+closeButton.MouseButton1Click:Connect(function()
+    gui:Destroy()
+end)
+
+-- Botão de minimizar (Verde)
+local minimizeButton = Instance.new("TextButton")
+minimizeButton.Name = "MinimizeButton"
+minimizeButton.Text = "—"
+minimizeButton.Size = UDim2.new(0, 25, 0, 25)
+minimizeButton.Position = UDim2.new(1, -55, 0, 2)
+minimizeButton.BackgroundColor3 = Color3.new(0.3, 1, 0.3)
+minimizeButton.Font = Enum.Font.SourceSans
+minimizeButton.TextColor3 = Color3.new(0, 0, 0)
+minimizeButton.Parent = topBar
+
+minimizeButton.MouseButton1Click:Connect(function()
+    mainFrame.Visible = false
+end)
+
+-- Sidebar de seleção (Vermelho na imagem)
+local sideBar = Instance.new("Frame")
+sideBar.Name = "SideBar"
+sideBar.Size = UDim2.new(0, 150, 1, -30)
+sideBar.Position = UDim2.new(0, 0, 0, 30)
+sideBar.BackgroundColor3 = SIDEBAR_COLOR
+sideBar.BorderColor3 = BORDER_COLOR
+sideBar.Parent = mainFrame
+
+-- Área de conteúdo (Verde na imagem)
+local contentArea = Instance.new("Frame")
+contentArea.Name = "ContentArea"
+contentArea.Size = UDim2.new(1, -150, 1, -30)
+contentArea.Position = UDim2.new(0, 150, 0, 30)
+contentArea.BackgroundColor3 = CONTENT_COLOR
+contentArea.BorderColor3 = BORDER_COLOR
+contentArea.Parent = mainFrame
+
+-- Abas selecionáveis
+local tabs = {}
+local currentTab = "Main"
+
+local function createTab(name, yPosition, content)
+    local tabButton = Instance.new("TextButton")
+    tabButton.Name = name .. "Tab"
+    tabButton.Text = name
+    tabButton.Size = UDim2.new(1, 0, 0, 30)
+    tabButton.Position = UDim2.new(0, 0, 0, yPosition)
+    tabButton.BackgroundTransparency = 1
+    tabButton.TextColor3 = MAIN_COLOR
+    tabButton.Font = Enum.Font.SourceSansBold
+    tabButton.TextSize = 18
+    tabButton.TextXAlignment = Enum.TextXAlignment.Left
+    tabButton.TextScaled = false
+    tabButton.Parent = sideBar
+
+    tabButton.MouseEnter:Connect(function()
+        if currentTab ~= name then
+            tabButton.TextColor3 = Color3.new(1,1,1) -- Cor mais clara ao passar o mouse
+        end
+    end)
+
+    tabButton.MouseLeave:Connect(function()
+        if currentTab ~= name then
+            tabButton.TextColor3 = MAIN_COLOR
+        end
+    end)
+
+    tabs[name] = {Button = tabButton, Content = content}
+
+    tabButton.MouseButton1Click:Connect(function()
+        for _, tabInfo in pairs(tabs) do
+            tabInfo.Content.Visible = false
+            tabInfo.Button.TextColor3 = MAIN_COLOR
+        end
+        currentTab = name
+        tabs[currentTab].Content.Visible = true
+        tabs[currentTab].Button.TextColor3 = Color3.new(1,1,1)
+    end)
+end
+
+-- Conteúdo da aba "Main"
+local mainContent = Instance.new("Frame")
+mainContent.Name = "MainContent"
+mainContent.Size = UDim2.new(1, 0, 1, 0)
+mainContent.BackgroundTransparency = 1
+mainContent.Parent = contentArea
+mainContent.Visible = true
+
+-- Conteúdo da aba "Autofarm"
+local autofarmContent = Instance.new("Frame")
+autofarmContent.Name = "AutofarmContent"
+autofarmContent.Size = UDim2.new(1, 0, 1, 0)
+autofarmContent.BackgroundTransparency = 1
+autofarmContent.Parent = contentArea
+autofarmContent.Visible = false
+
+-- Cria os botões de aba
+createTab("Main", 10, mainContent)
+createTab("Autofarm", 50, autofarmContent)
+
+-- Atualiza a cor da aba inicial para selecionada
+tabs[currentTab].Button.TextColor3 = Color3.new(1,1,1)
+
+-- Funcionalidade de arrastar a janela
+local dragging = false
+local dragOffset = Vector2.new()
+
+topBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragOffset = input.Position - Vector2.new(mainFrame.Position.X.Offset, mainFrame.Position.Y.Offset)
+        topBar.ZIndex = 2
+    end
+end)
+
+topBar.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+        topBar.ZIndex = 1
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        mainFrame.Position = UDim2.new(0, input.Position.X - dragOffset.X, 0, input.Position.Y - dragOffset.Y)
+    end
+end)
+
+-- Tecla de atalho 'G' para minimizar/mostrar
+UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+    if not gameProcessedEvent and input.KeyCode == Enum.KeyCode.G then
+        mainFrame.Visible = not mainFrame.Visible
+    end
+end)
