@@ -1,15 +1,15 @@
--- UI estilo pasta macOS + Scripts de Secrets/BrainrotGods/Test
--- Delta Executor
+-- UI estilo pasta macOS - Fair Hub (integrado com AutoFarm)
+-- Feito para rodar no Delta Executor
 
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
-local CoreGui = game:GetService("CoreGui")
 
 --========================================================--
--- Listas e estados
+-- Listas e estados de AutoFarm
 --========================================================--
 local lists = {
     Secrets = {"La Vacca Saturno Saturnita","Karkerkar Kurkur","Chimpanzini Spiderini"},
@@ -34,7 +34,7 @@ local function safeFirePrompt(prompt, holdTime)
     holdTime = holdTime or 2
     if not prompt or not prompt:IsA("ProximityPrompt") then return false end
     if firePromptFn then
-        local ok, err = pcall(function() firePromptFn(prompt, holdTime) end)
+        local ok, _ = pcall(function() firePromptFn(prompt, holdTime) end)
         if ok then return true end
     end
     return false
@@ -54,11 +54,10 @@ local function acharParteAlvo(model)
     end
 end
 
-local function seguirEInteragirAteSumir(model, displayName)
+local function seguirEInteragirAteSumir(model)
     local char, humanoid, hrp = waitForCharacterParts(5)
     if not char or not humanoid or not hrp then return end
-
-    local lastPrint, lastFireTime, tentativas = 0, 0, 0
+    local lastFireTime, tentativas = 0, 0
     local connection
     connection = RunService.Heartbeat:Connect(function()
         if not model or not model.Parent then connection:Disconnect() return end
@@ -86,6 +85,7 @@ gui.Name = "FairHubUI"
 gui.Parent = CoreGui
 gui.ResetOnSpawn = false
 
+-- Janela principal
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 300, 0, 220)
 mainFrame.Position = UDim2.new(0.5, -150, 0.5, -110)
@@ -97,16 +97,30 @@ mainFrame.Active = true
 mainFrame.Draggable = true
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0,8)
 
+-- Sidebar
 local sidebar = Instance.new("Frame")
-sidebar.Size = UDim2.new(0, 90, 1, 0)
+sidebar.Size = UDim2.new(0,90,1,0)
 sidebar.BackgroundColor3 = Color3.fromRGB(232,247,247)
 sidebar.BackgroundTransparency = 0.25
 sidebar.BorderSizePixel = 0
 sidebar.Parent = mainFrame
 Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0,8)
 
+-- Título
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,-10,0,20)
+title.Position = UDim2.new(0,5,0,0)
+title.BackgroundTransparency = 1
+title.Text = "Fair Hub"
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 16
+title.TextColor3 = Color3.fromRGB(0,128,128)
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = sidebar
+
+-- Conteúdo principal
 local content = Instance.new("Frame")
-content.Size = UDim2.new(1, -92, 1, 0)
+content.Size = UDim2.new(1,-92,1,0)
 content.Position = UDim2.new(0,92,0,0)
 content.BackgroundColor3 = Color3.fromRGB(232,247,247)
 content.BackgroundTransparency = 0.25
@@ -115,25 +129,15 @@ content.Parent = mainFrame
 Instance.new("UICorner", content).CornerRadius = UDim.new(0,8)
 
 -- Função para mostrar conteúdo no painel
-local function showContent(text)
+local function showContent(frame)
     content:ClearAllChildren()
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1,-10,1,-10)
-    label.Position = UDim2.new(0,5,0,5)
-    label.BackgroundTransparency = 1
-    label.Text = text
-    label.Font = Enum.Font.SourceSansBold
-    label.TextSize = 24
-    label.TextColor3 = Color3.fromRGB(0,128,128)
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.TextYAlignment = Enum.TextYAlignment.Top
-    label.Parent = content
+    frame.Parent = content
 end
 
 --========================================================--
--- Botões Sidebar
+-- Criar botão sidebar
 --========================================================--
-local function createButton(name, yPos, callback)
+local function createSidebarButton(name, yPos, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1,-10,0,20)
     btn.Position = UDim2.new(0,5,0,yPos)
@@ -150,21 +154,70 @@ local function createButton(name, yPos, callback)
     return btn
 end
 
--- Criando botões
-createButton("Main",30,function() showContent("Main") end)
-createButton("Auto Farm",60,function() showContent("Auto Farm") end)
-createButton("Secrets",90,function() showContent("Secrets") end)
-createButton("BrainrotGods",120,function() showContent("BrainrotGods") end)
-createButton("Test",150,function() showContent("Test") end)
+--========================================================--
+-- Frames de conteúdo
+--========================================================--
+-- Main
+local mainContent = Instance.new("TextLabel")
+mainContent.Size = UDim2.new(1,-10,1,-10)
+mainContent.Position = UDim2.new(0,5,0,5)
+mainContent.BackgroundTransparency = 1
+mainContent.Text = "Main"
+mainContent.Font = Enum.Font.SourceSansBold
+mainContent.TextSize = 24
+mainContent.TextColor3 = Color3.fromRGB(0,128,128)
+mainContent.TextXAlignment = Enum.TextXAlignment.Left
+mainContent.TextYAlignment = Enum.TextYAlignment.Top
+
+-- AutoFarm
+local autoFarmContent = Instance.new("Frame")
+autoFarmContent.Size = UDim2.new(1,0,1,0)
+autoFarmContent.BackgroundTransparency = 1
+
+-- Criar checkboxes para cada lista dentro de AutoFarm
+local function createCheckbox(text, listKey, order)
+    local holder = Instance.new("Frame", autoFarmContent)
+    holder.Size = UDim2.new(1,-10,0,30)
+    holder.Position = UDim2.new(0,5,0,(order-1)*35)
+    holder.BackgroundTransparency = 1
+
+    local box = Instance.new("TextButton", holder)
+    box.Size = UDim2.new(0,25,0,25)
+    box.Position = UDim2.new(0,0,0.5,-12)
+    box.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    Instance.new("UICorner", box)
+    box.Text = ""
+    box.MouseButton1Click:Connect(function()
+        activeLists[listKey] = not activeLists[listKey]
+        box.BackgroundColor3 = activeLists[listKey] and Color3.fromRGB(0,170,0) or Color3.fromRGB(60,60,60)
+    end)
+
+    local label = Instance.new("TextLabel", holder)
+    label.Size = UDim2.new(1,-35,1,0)
+    label.Position = UDim2.new(0,35,0,0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(0,0,0)
+    label.TextXAlignment = Enum.TextXAlignment.Left
+end
+
+createCheckbox("Secrets", "Secrets", 1)
+createCheckbox("BrainrotGods", "BrainrotGods", 2)
+createCheckbox("Test", "Test", 3)
 
 --========================================================--
--- Botão verde para destruir GUI
+-- Botões da sidebar
+--========================================================--
+createSidebarButton("Main", 30, function() showContent(mainContent) end)
+createSidebarButton("Auto Farm", 60, function() showContent(autoFarmContent) end)
+
+--========================================================--
+-- Botão verde destruir GUI
 --========================================================--
 local topBar = Instance.new("Frame", mainFrame)
 topBar.Size = UDim2.new(0,45,0,14)
 topBar.Position = UDim2.new(1,-55,0,5)
 topBar.BackgroundTransparency = 1
-
 local dot = Instance.new("Frame", topBar)
 dot.Size = UDim2.new(0,10,0,10)
 dot.Position = UDim2.new(0,30,0,0)
@@ -174,9 +227,7 @@ local clickDetector = Instance.new("TextButton", dot)
 clickDetector.Size = UDim2.new(1,0,1,0)
 clickDetector.BackgroundTransparency = 1
 clickDetector.Text = ""
-clickDetector.MouseButton1Click:Connect(function()
-    gui:Destroy()
-end)
+clickDetector.MouseButton1Click:Connect(function() gui:Destroy() end)
 
 --========================================================--
 -- Monitorar MovingAnimals e executar ações
@@ -193,9 +244,7 @@ movingAnimals.ChildAdded:Connect(function(model)
         if activeLists[listName] then
             for _, name in ipairs(names) do
                 if txt == name then
-                    task.spawn(function()
-                        seguirEInteragirAteSumir(model, txt)
-                    end)
+                    task.spawn(function() seguirEInteragirAteSumir(model) end)
                     return
                 end
             end
@@ -204,7 +253,7 @@ movingAnimals.ChildAdded:Connect(function(model)
 end)
 
 --========================================================--
--- Abrir/Fechar GUI com G
+-- Abrir/Fechar GUI com tecla G
 --========================================================--
 local visible = true
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -215,4 +264,4 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-print("[Script] GUI pronta e integração ativa!")
+print("[Script] GUI pronta com AutoFarm integrado!")
