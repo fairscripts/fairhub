@@ -1,69 +1,135 @@
--- Script para CoreGUI, compatível com Delta Executor
--- NOTA: O CoreGUI requer a criação de objetos usando Instance.new()
+-- // UI estilo pasta Mac - Fair Hub
+-- Pode rodar diretamente no Delta Executor
 
--- Acessa o serviço CoreGui
-local CoreGUI = game:GetService("CoreGui")
+-- Serviços
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
 
--- Cria a janela principal da UI
-local main_frame = Instance.new("Frame")
-main_frame.Name = "macOS_Folder"
-main_frame.Parent = CoreGUI
-main_frame.Size = UDim2.new(0.6, 0, 0.7, 0)
-main_frame.Position = UDim2.new(0.5, 0, 0.5, 0)
-main_frame.AnchorPoint = Vector2.new(0.5, 0.5)
-main_frame.BackgroundColor3 = Color3.new(0.15, 0.15, 0.15)
-main_frame.BorderSizePixel = 0
-main_frame.Draggable = true
+-- Remove UI antiga se já existir
+if CoreGui:FindFirstChild("FairHubUI") then
+    CoreGui.FairHubUI:Destroy()
+end
 
--- Cria o painel lateral roxo
-local left_panel = Instance.new("Frame")
-left_panel.Name = "left_panel"
-left_panel.Parent = main_frame
-left_panel.Size = UDim2.new(0.25, 0, 1, 0)
-left_panel.Position = UDim2.new(0, 0, 0, 0)
-left_panel.BackgroundColor3 = Color3.new(0.25, 0.05, 0.25)
-left_panel.BorderSizePixel = 0
+-- ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "FairHubUI"
+gui.Parent = CoreGui
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.ResetOnSpawn = false
 
--- Adiciona o texto "fair hub" com fundo ciano
-local title_label = Instance.new("TextLabel")
-title_label.Name = "title_label"
-title_label.Parent = left_panel
-title_label.Text = "fair hub"
-title_label.Size = UDim2.new(1, 0, 0.1, 0)
-title_label.Position = UDim2.new(0, 0, 0, 0)
-title_label.BackgroundColor3 = Color3.new(0, 0.75, 1) -- Cor ciano
-title_label.TextColor3 = Color3.new(1, 1, 1)
-title_label.TextScaled = true
-title_label.Font = Enum.Font.SourceSansBold
-title_label.TextXAlignment = Enum.TextXAlignment.Left
-title_label.TextYAlignment = Enum.TextYAlignment.Center
-title_label.Padding = 10
+-- Janela principal
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0.45, 0, 0.7, 0) -- Tamanho ajustado para ser mais proporcional
+mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30) -- Cor escura para o painel principal
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = gui
+mainFrame.Active = true
+mainFrame.Draggable = true
 
--- Adiciona o botão "Auto Farm"
-local auto_farm_button = Instance.new("TextButton")
-auto_farm_button.Name = "auto_farm_button"
-auto_farm_button.Parent = left_panel
-auto_farm_button.Text = "Auto Farm"
-auto_farm_button.Size = UDim2.new(1, 0, 0.08, 0)
-auto_farm_button.Position = UDim2.new(0, 0, 0.2, 0)
-auto_farm_button.BackgroundColor3 = Color3.new(0.3, 0.1, 0.3)
-auto_farm_button.TextColor3 = Color3.new(1, 1, 1)
-auto_farm_button.TextScaled = true
-auto_farm_button.Font = Enum.Font.SourceSansBold
-auto_farm_button.TextXAlignment = Enum.TextXAlignment.Left
-auto_farm_button.TextYAlignment = Enum.TextYAlignment.Center
-auto_farm_button.Padding = 10
+-- Cantos arredondados na janela principal
+local mainCorner = Instance.new("UICorner", mainFrame)
+mainCorner.CornerRadius = UDim.new(0, 8)
 
--- Cria o painel principal de conteúdo
-local main_panel = Instance.new("Frame")
-main_panel.Name = "main_panel"
-main_panel.Parent = main_frame
-main_panel.Size = UDim2.new(0.75, 0, 1, 0)
-main_panel.Position = UDim2.new(0.25, 0, 0, 0)
-main_panel.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-main_panel.BorderSizePixel = 0
+-- Painel lateral (roxo)
+local sidebar = Instance.new("Frame")
+sidebar.Size = UDim2.new(0.3, 0, 1, 0) -- Largura ajustada para 30% da janela
+sidebar.Position = UDim2.new(0, 0, 0, 0)
+sidebar.BackgroundColor3 = Color3.fromRGB(90, 30, 90) -- Cor roxa
+sidebar.BorderSizePixel = 0
+sidebar.Parent = mainFrame
+sidebar.ZIndex = 2 -- Garante que o painel lateral esteja acima do principal
 
--- Conecta a funcionalidade ao botão "Auto Farm"
-auto_farm_button.MouseButton1Click:Connect(function()
-    print("Auto Farm ativado! Execute seu script de auto farm aqui.")
+-- Cantos arredondados apenas no lado esquerdo do painel lateral (limitação do UICorner, que afeta todos os cantos)
+local sidebarCorner = Instance.new("UICorner", sidebar)
+sidebarCorner.CornerRadius = UDim.new(0, 8)
+
+-- Painel para a área do título (ciano)
+local titlePanel = Instance.new("Frame")
+titlePanel.Size = UDim2.new(1, 0, 0, 40)
+titlePanel.Position = UDim2.new(0, 0, 0, 0)
+titlePanel.BackgroundColor3 = Color3.fromRGB(0, 200, 255) -- Cor ciano
+titlePanel.Parent = sidebar
+
+-- Título "Fair Hub"
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 1, 0)
+title.BackgroundTransparency = 1
+title.Text = "Fair Hub"
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 20
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextXAlignment = Enum.TextXAlignment.Center
+title.Parent = titlePanel
+
+-- Lista de itens na barra lateral
+local sidebarList = Instance.new("UIListLayout", sidebar)
+sidebarList.Padding = UDim.new(0, 10)
+sidebarList.SortOrder = Enum.SortOrder.LayoutOrder
+sidebarList.HorizontalAlignment = Enum.HorizontalAlignment.Left
+sidebarList.VerticalAlignment = Enum.VerticalAlignment.Top
+
+local sidebarPadding = Instance.new("Frame", sidebar)
+sidebarPadding.Size = UDim2.new(1, 0, 0, 60)
+sidebarPadding.BackgroundTransparency = 1
+sidebarPadding.LayoutOrder = 1
+
+-- Botão "Auto Farm"
+local autoFarmBtn = Instance.new("TextButton")
+autoFarmBtn.Name = "AutoFarmButton"
+autoFarmBtn.Size = UDim2.new(1, -20, 0, 30)
+autoFarmBtn.Position = UDim2.new(0, 10, 0, 60)
+autoFarmBtn.BackgroundColor3 = Color3.fromRGB(130, 50, 130)
+autoFarmBtn.Text = "Auto Farm"
+autoFarmBtn.Font = Enum.Font.SourceSansBold
+autoFarmBtn.TextSize = 18
+autoFarmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoFarmBtn.BorderSizePixel = 0
+autoFarmBtn.Parent = sidebar
+autoFarmBtn.LayoutOrder = 2
+autoFarmBtn.TextXAlignment = Enum.TextXAlignment.Left -- Alinha o texto à esquerda
+autoFarmBtn.Padding = 10 -- Adiciona um espaço à esquerda do texto
+
+local btnCorner = Instance.new("UICorner", autoFarmBtn)
+btnCorner.CornerRadius = UDim.new(0, 6)
+
+-- Animação hover
+autoFarmBtn.MouseEnter:Connect(function()
+    TweenService:Create(autoFarmBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(150, 70, 150)}):Play()
+end)
+autoFarmBtn.MouseLeave:Connect(function()
+    TweenService:Create(autoFarmBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(130, 50, 130)}):Play()
+end)
+
+-- Painel principal de conteúdo (à direita)
+local mainPanel = Instance.new("Frame")
+mainPanel.Size = UDim2.new(0.7, 0, 1, 0)
+mainPanel.Position = UDim2.new(0.3, 0, 0, 0)
+mainPanel.BackgroundColor3 = Color3.fromRGB(40, 38, 43)
+mainPanel.BorderSizePixel = 0
+mainPanel.Parent = mainFrame
+
+-- Borda separadora entre os painéis
+local separator = Instance.new("Frame", mainFrame)
+separator.Size = UDim2.new(0, 1, 1, 0)
+separator.Position = UDim2.new(0.3, 0, 0, 0)
+separator.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+separator.BorderSizePixel = 0
+separator.ZIndex = 3
+
+-- Animação de entrada da UI
+mainFrame.Visible = false
+mainFrame.Position = UDim2.new(0.5, 0, 0, -350)
+mainFrame.Visible = true
+
+TweenService:Create(mainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Position = UDim2.new(0.5, 0, 0.5, 0)}):Play()
+
+-- Função do botão
+autoFarmBtn.MouseButton1Click:Connect(function()
+    print("Auto Farm ativado! Aqui você coloca a funcionalidade do seu script de farm.")
+    -- Exemplo: Crie ou ative um script de auto farm aqui
+    -- local autoFarmScript = Instance.new("Script")
+    -- autoFarmScript.Parent = workspace
+    -- autoFarmScript.Source = "while true do wait(1) print('farmando...') end"
 end)
