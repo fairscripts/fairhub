@@ -16,12 +16,25 @@ gui.Parent = CoreGui
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
+-- Sombra externa
+local shadow = Instance.new("ImageLabel")
+shadow.Name = "Shadow"
+shadow.Size = UDim2.new(0, 320, 0, 220) -- sombra um pouco maior
+shadow.Position = UDim2.new(0.5, -160, 0.5, -110)
+shadow.BackgroundTransparency = 1
+shadow.Image = "rbxassetid://1316045217" -- textura de sombra do Roblox
+shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+shadow.ImageTransparency = 0.4
+shadow.ScaleType = Enum.ScaleType.Slice
+shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+shadow.Parent = gui
+
 -- Janela principal
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 300, 0, 200) -- metade do tamanho anterior
+mainFrame.Size = UDim2.new(0, 300, 0, 200)
 mainFrame.Position = UDim2.new(0.5, -150, 0.5, -100)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 30, 35)
-mainFrame.BackgroundTransparency = 0.15 -- leve transparência
+mainFrame.BackgroundTransparency = 0.15
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = gui
 mainFrame.Active = true
@@ -43,6 +56,14 @@ gradient.Color = ColorSequence.new{
     ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 20, 80)),
     ColorSequenceKeypoint.new(1, Color3.fromRGB(160, 60, 160))
 }
+
+-- Barra de separação preta
+local separator = Instance.new("Frame")
+separator.Size = UDim2.new(0, 2, 1, 0)
+separator.Position = UDim2.new(0, 90, 0, 0)
+separator.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+separator.BorderSizePixel = 0
+separator.Parent = mainFrame
 
 -- Título "Fair Hub"
 local title = Instance.new("TextLabel")
@@ -72,8 +93,8 @@ Instance.new("UICorner", autoFarmBtn).CornerRadius = UDim.new(0, 4)
 
 -- Área principal
 local content = Instance.new("Frame")
-content.Size = UDim2.new(1, -90, 1, 0)
-content.Position = UDim2.new(0, 90, 0, 0)
+content.Size = UDim2.new(1, -92, 1, 0)
+content.Position = UDim2.new(0, 92, 0, 0)
 content.BackgroundColor3 = Color3.fromRGB(45, 40, 45)
 content.BackgroundTransparency = 0.15
 content.BorderSizePixel = 0
@@ -115,5 +136,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.KeyCode == Enum.KeyCode.G then
         visible = not visible
         mainFrame.Visible = visible
+        shadow.Visible = visible
     end
 end)
