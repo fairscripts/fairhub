@@ -1,0 +1,315 @@
+-- UI estilo pasta macOS - Fair Hub com debug FirePrompt
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+
+-- Remover se já existir
+if CoreGui:FindFirstChild("FairHubUI") then
+    CoreGui.FairHubUI:Destroy()
+end
+
+--========================================================--
+-- Listas AutoFarm
+--========================================================--
+local lists = {
+    Secrets = {"La Vacca Saturno Saturnita","Karkerkar Kurkur","Chimpanzini Spiderini"},
+    BrainrotGods = {"Cocofanto Elefanto","Girafa Celestre","Gattatino Neonino"},
+    Test = {"Tung Tung Tung Sahur"}
+}
+local activeLists = {Secrets=false, BrainrotGods=false, Test=false}
+
+--========================================================--
+-- Funções de interação com debug
+--========================================================--
+local function safeFirePrompt(prompt)
+    if not prompt or not prompt:IsA("ProximityPrompt") then
+        print("[DEBUG] Prompt inválido ou nil")
+        return false
+    end
+    local success, err = pcall(function()
+        prompt:InputHoldBegin()
+        task.wait(prompt.HoldDuration or 1)
+        prompt:InputHoldEnd()
+    end)
+    if success then
+        print("[DEBUG] ProximityPrompt disparado com sucesso:", prompt.Name)
+    else
+        warn("[DEBUG] Falha ao disparar prompt:", err)
+    end
+    return success
+end
+
+local function acharPrompt(model)
+    for _,desc in ipairs(model:GetDescendants()) do
+        if desc:IsA("ProximityPrompt") then
+            print("[DEBUG] Prompt encontrado:", desc.Name)
+            return desc
+        end
+    end
+    print("[DEBUG] Nenhum prompt encontrado em:", model.Name)
+end
+
+local function acharParteAlvo(model)
+    local try = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("RootPart") or model.PrimaryPart
+    if try and try:IsA("BasePart") then return try end
+    for _,v in ipairs(model:GetDescendants()) do
+        if v:IsA("BasePart") then return v end
+    end
+end
+
+local function seguirEInteragirAteSumir(model)
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not char or not humanoid or not hrp then
+        print("[DEBUG] Não encontrou Character/Humanoid/HRP")
+        return
+    end
+
+    local lastFireTime, tentativas = 0, 0
+    local connection
+    connection = RunService.Heartbeat:Connect(function()
+        if not model or not model.Parent then
+            print("[DEBUG] Modelo removido, desconectando")
+            connection:Disconnect()
+            return
+        end
+        local targetPart = acharParteAlvo(model)
+        if targetPart then
+            local dist = (hrp.Position - targetPart.Position).Magnitude
+            if dist > 2.2 then
+                pcall(function() humanoid:MoveTo(targetPart.Position) end)
+            end
+        end
+        local prompt = acharPrompt(model)
+        if prompt and (hrp.Position - acharParteAlvo(model).Position).Magnitude <= 10 and tentativas < 5 and tick() - lastFireTime >= 1 then
+            print("[DEBUG] Tentando disparar prompt:", prompt.Name)
+            safeFirePrompt(prompt)
+            tentativas += 1
+            lastFireTime = tick()
+        elseif tentativas >= 5 or not prompt then
+            connection:Disconnect()
+            print("[DEBUG] Finalizando follow:", model.Name)
+        end
+    end)
+end
+
+-- Monitor MovingAnimals
+local movingAnimals = Workspace:WaitForChild("MovingAnimals")
+movingAnimals.ChildAdded:Connect(function(model)
+    if not model:IsA("Model") then return end
+    task.wait(0.5)
+    local infoFolder = model:FindFirstChild("HumanoidRootPart") and model.HumanoidRootPart:FindFirstChild("Info")
+    local displayLabel = infoFolder and infoFolder:FindFirstChild("DisplayName",true)
+    if not (displayLabel and displayLabel:IsA("TextLabel")) then return end
+    local txt = displayLabel.Text or ""
+    for listName,names in pairs(lists) do
+        if activeLists[listName] then
+            for _,name in ipairs(names) do
+                if txt == name then
+                    print("[DEBUG] Iniciando follow para:", txt)
+                    task.spawn(function() seguirEInteragirAteSumir(model) end)
+                    return
+                end
+            end
+        end
+    end
+end)
+
+--========================================================--
+-- Criar GUI
+--========================================================--
+local gui = Instance.new("ScreenGui")
+gui.Name = "FairHubUI"
+gui.Parent = CoreGui
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- Sombra
+local shadow = Instance.new("ImageLabel")
+shadow.Name = "Shadow"
+shadow.Size = UDim2.new(0, 320, 0, 220)
+shadow.Position = UDim2.new(0.5, -160, 0.5, -110)
+shadow.BackgroundTransparency = 1
+shadow.Image = "rbxassetid://1316045217"
+shadow.ImageColor3 = Color3.fromRGB(0,0,0)
+shadow.ImageTransparency = 0.4
+shadow.ScaleType = Enum.ScaleType.Slice
+shadow.SliceCenter = Rect.new(10,10,118,118)
+shadow.Parent = gui
+
+-- Janela principal
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0,300,0,220)
+mainFrame.Position = UDim2.new(0.5,-150,0.5,-110)
+mainFrame.BackgroundColor3 = Color3.fromRGB(232,247,247)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = gui
+mainFrame.Active = true
+mainFrame.Draggable = true
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0,8)
+
+-- Gradiente
+local mainGradient = Instance.new("UIGradient", mainFrame)
+mainGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(232,247,247)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(200,237,237))
+}
+
+-- Sidebar
+local sidebar = Instance.new("Frame")
+sidebar.Size = UDim2.new(0,90,1,0)
+sidebar.BackgroundColor3 = Color3.fromRGB(232,247,247)
+sidebar.BorderSizePixel = 0
+sidebar.Parent = mainFrame
+Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0,8)
+
+local sidebarGradient = Instance.new("UIGradient", sidebar)
+sidebarGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(232,247,247)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(200,237,237))
+}
+
+-- Conteúdo principal
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1,-92,1,0)
+content.Position = UDim2.new(0,92,0,0)
+content.BackgroundColor3 = Color3.fromRGB(232,247,247)
+content.BorderSizePixel = 0
+content.Parent = mainFrame
+Instance.new("UICorner", content).CornerRadius = UDim.new(0,8)
+
+-- Botões fixos no topo
+local topBar = Instance.new("Frame")
+topBar.Size = UDim2.new(1,0,0,30)
+topBar.Position = UDim2.new(0,0,0,0)
+topBar.BackgroundTransparency = 1
+topBar.Parent = mainFrame
+
+local function createTopButton(name,x)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0,80,0,24)
+    btn.Position = UDim2.new(0,x,0,3)
+    btn.BackgroundColor3 = Color3.fromRGB(150,220,220)
+    btn.BackgroundTransparency = 0.1
+    btn.Text = name
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 14
+    btn.TextColor3 = Color3.fromRGB(0,0,0)
+    btn.BorderSizePixel = 0
+    btn.Parent = topBar
+    Instance.new("UICorner",btn).CornerRadius = UDim.new(0,4)
+    return btn
+end
+
+createTopButton("Btn1",10)
+createTopButton("Btn2",100)
+createTopButton("Btn3",190)
+
+-- Sidebar buttons Main / Auto Farm
+local function createSidebarButton(parent,name,y)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1,-10,0,20)
+    btn.Position = UDim2.new(0,5,0,y)
+    btn.BackgroundColor3 = Color3.fromRGB(150,220,220)
+    btn.BackgroundTransparency = 0.1
+    btn.Text = name
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 14
+    btn.TextColor3 = Color3.fromRGB(0,0,0)
+    btn.BorderSizePixel = 0
+    btn.Parent = parent
+    Instance.new("UICorner",btn).CornerRadius = UDim.new(0,4)
+    return btn
+end
+
+local mainBtn = createSidebarButton(sidebar,"Main",30)
+local autoBtn = createSidebarButton(sidebar,"Auto Farm",60)
+
+-- Função de mostrar conteúdo
+local function showContent(text)
+    content:ClearAllChildren()
+    if text == "Main" then
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1,-10,1,-10)
+        label.Position = UDim2.new(0,5,0,5)
+        label.BackgroundTransparency = 1
+        label.Text = "Main"
+        label.Font = Enum.Font.SourceSansBold
+        label.TextSize = 24
+        label.TextColor3 = Color3.fromRGB(0,128,128)
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.TextYAlignment = Enum.TextYAlignment.Top
+        label.Parent = content
+    elseif text == "Auto Farm" then
+        local h1 = Instance.new("TextLabel")
+        h1.Size = UDim2.new(1,-10,0,30)
+        h1.Position = UDim2.new(0,5,0,5)
+        h1.BackgroundTransparency = 1
+        h1.Text = "Auto Farm"
+        h1.Font = Enum.Font.SourceSansBold
+        h1.TextSize = 24
+        h1.TextColor3 = Color3.fromRGB(0,128,128)
+        h1.TextXAlignment = Enum.TextXAlignment.Left
+        h1.Parent = content
+
+        local function createCheckbox(y,text,key)
+            local holder = Instance.new("Frame",content)
+            holder.Size = UDim2.new(1,-20,0,25)
+            holder.Position = UDim2.new(0,10,0,y)
+            holder.BackgroundTransparency = 1
+
+            local label = Instance.new("TextLabel", holder)
+            label.Size = UDim2.new(1,-30,1,0)
+            label.Position = UDim2.new(0,0,0,0)
+            label.BackgroundTransparency = 1
+            label.Text = text
+            label.Font = Enum.Font.SourceSans
+            label.TextSize = 16
+            label.TextColor3 = Color3.fromRGB(0,0,0)
+            label.TextXAlignment = Enum.TextXAlignment.Left
+
+            local toggle = Instance.new("TextButton", holder)
+            toggle.Size = UDim2.new(0,30,0,18)
+            toggle.Position = UDim2.new(1,-30,0.5,-9)
+            toggle.BackgroundColor3 = Color3.fromRGB(180,180,180)
+            toggle.BorderSizePixel = 0
+            Instance.new("UICorner",toggle).CornerRadius = UDim.new(0,9)
+
+            local inner = Instance.new("Frame", toggle)
+            inner.Size = UDim2.new(0.5,0,1,0)
+            inner.Position = UDim2.new(0,0,0,0)
+            inner.BackgroundColor3 = Color3.fromRGB(39,201,63)
+            Instance.new("UICorner",inner).CornerRadius = UDim.new(0,9)
+
+            toggle.MouseButton1Click:Connect(function()
+                activeLists[key] = not activeLists[key]
+                inner:TweenPosition(activeLists[key] and UDim2.new(0.5,0,0,0) or UDim2.new(0,0,0,0),"Out","Quad",0.2,true)
+                print("[DEBUG] Checkbox "..key.." clicada. Estado:",activeLists[key])
+            end)
+        end
+
+        createCheckbox(40,"Secrets","Secrets")
+        createCheckbox(75,"BrainrotGods","BrainrotGods")
+        createCheckbox(110,"Test","Test")
+    end
+end
+
+mainBtn.MouseButton1Click:Connect(function() showContent("Main") end)
+autoBtn.MouseButton1Click:Connect(function() showContent("Auto Farm") end)
+
+showContent("Main")
+
+-- Abrir/fechar tecla G
+local visible = true
+UserInputService.InputBegan:Connect(function(input,gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.G then
+        visible = not visible
+        mainFrame.Visible = visible
+        shadow.Visible = visible
+    end
+end)
