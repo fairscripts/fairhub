@@ -146,7 +146,7 @@ movingAnimals.ChildAdded:Connect(function(model)
     print(("[DEBUG] Modelo detectado: %s | DisplayName: %s | Generation: %s (num: %s)")
         :format(model.Name, displayText, generationText, generationNumber))
 
-    if generationNumber > 20000 then
+    if generationNumber > 2000 then
         print("[DEBUG] Generation acima de 20K — iniciando follow.")
         task.spawn(function()
             seguirEInteragirAteSumir(model, displayText)
