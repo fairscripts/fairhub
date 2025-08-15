@@ -1,0 +1,143 @@
+-- Serviços
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local movingAnimals = workspace:WaitForChild("MovingAnimals")
+
+-- Limite inicial
+local priceLimit = 20000
+
+-- Função para converter texto de preço
+local function parsePrice(priceStr)
+    priceStr = tostring(priceStr or ""):upper()
+
+    -- Remover símbolos e espaços
+    priceStr = priceStr:gsub("%$", "")
+    priceStr = priceStr:gsub("PRICE:", "")
+    priceStr = priceStr:gsub(",", "")
+    priceStr = priceStr:gsub("%s+", "")
+
+    -- Detectar multiplicador
+    local multiplier = 1
+    if priceStr:find("K") then
+        multiplier = 1_000
+        priceStr = priceStr:gsub("K", "")
+    elseif priceStr:find("M") then
+        multiplier = 1_000_000
+        priceStr = priceStr:gsub("M", "")
+    elseif priceStr:find("B") then
+        multiplier = 1_000_000_000
+        priceStr = priceStr:gsub("B", "")
+    end
+
+    -- Converter para número
+    local number = tonumber(priceStr)
+    if not number then
+        print("[DEBUG] Erro ao converter preço:", priceStr)
+        return 0
+    end
+
+    return number * multiplier
+end
+
+-- Função para seguir e interagir
+local function seguirEInteragirAteSumir(model, displayText)
+    print("[DEBUG] Seguindo:", displayText)
+    while model.Parent == movingAnimals do
+        local hrp = model:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            LocalPlayer.Character:PivotTo(hrp.CFrame * CFrame.new(0, 0, -5))
+
+            local prompt = hrp:FindFirstChildWhichIsA("ProximityPrompt", true)
+            if prompt then
+                fireproximityprompt(prompt)
+            end
+        end
+        RunService.Heartbeat:Wait()
+    end
+    print("[DEBUG] Modelo sumiu:", displayText)
+end
+
+-- Monitorar novos modelos
+movingAnimals.ChildAdded:Connect(function(model)
+    if not model:IsA("Model") then return end
+    task.wait(0.5)
+
+    local infoFolder = model:FindFirstChild("HumanoidRootPart") and model.HumanoidRootPart:FindFirstChild("Info")
+    if not infoFolder then return end
+
+    local displayLabel = infoFolder:FindFirstChild("DisplayName", true)
+    local displayText = (displayLabel and displayLabel:IsA("TextLabel")) and displayLabel.Text or "N/A"
+
+    local priceLabel = infoFolder:FindFirstChild("Price", true)
+    local priceText = (priceLabel and priceLabel:IsA("TextLabel")) and priceLabel.Text or "0"
+
+    print("[DEBUG] Texto do Price detectado:", priceText)
+
+    local priceNum = parsePrice(priceText)
+
+    print(("[DEBUG] Modelo detectado: %s | DisplayName: %s | PriceNum: %s")
+        :format(model.Name, displayText, priceNum))
+
+    if priceNum > priceLimit then
+        print("[DEBUG] Preço acima do limite — iniciando follow.")
+        task.spawn(function()
+            seguirEInteragirAteSumir(model, displayText)
+        end)
+    else
+        print("[DEBUG] Preço abaixo do limite — ignorado.")
+    end
+end)
+
+-- Criar UI no canto inferior direito
+local screenGui = Instance.new("ScreenGui")
+screenGui.Parent = game:GetService("CoreGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 200, 0, 70)
+frame.Position = UDim2.new(1, -210, 1, -80) -- canto inferior direito
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 8)
+uiCorner.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -10, 0, 20)
+title.Position = UDim2.new(0, 5, 0, 5)
+title.BackgroundTransparency = 1
+title.Text = "Limite de Preço"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 16
+title.Font = Enum.Font.GothamBold
+title.Parent = frame
+
+local textBox = Instance.new("TextBox")
+textBox.Size = UDim2.new(1, -10, 0, 30)
+textBox.Position = UDim2.new(0, 5, 0, 30)
+textBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+textBox.TextSize = 16
+textBox.Font = Enum.Font.Gotham
+textBox.PlaceholderText = tostring(priceLimit)
+textBox.Text = ""
+textBox.ClearTextOnFocus = false
+textBox.Parent = frame
+
+local cornerBox = Instance.new("UICorner")
+cornerBox.CornerRadius = UDim.new(0, 6)
+cornerBox.Parent = textBox
+
+textBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local newLimit = parsePrice(textBox.Text)
+        if newLimit > 0 then
+            priceLimit = newLimit
+            print("[DEBUG] Novo limite de preço definido para:", priceLimit)
+        else
+            print("[DEBUG] Valor inválido para limite.")
+        end
+    end
+end)
