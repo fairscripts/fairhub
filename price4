@@ -1,0 +1,159 @@
+--========================================================--
+-- Configurações iniciais
+--========================================================--
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+
+--========================================================--
+-- Funções auxiliares
+--========================================================--
+local function waitForCharacterParts(timeout)
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local ok = pcall(function() char:WaitForChild("Humanoid", timeout) end)
+    local ok2 = pcall(function() char:WaitForChild("HumanoidRootPart", timeout) end)
+    return char, (ok and char:FindFirstChildOfClass("Humanoid")), (ok2 and char:FindFirstChild("HumanoidRootPart"))
+end
+
+local firePromptFn
+if typeof(fireproximityprompt) == "function" then
+    firePromptFn = fireproximityprompt
+elseif typeof(fireProximityPrompt) == "function" then
+    firePromptFn = fireProximityPrompt
+end
+
+local function safeFirePrompt(prompt, holdTime)
+    holdTime = holdTime or 2
+    if not prompt or not prompt:IsA("ProximityPrompt") then return false end
+    if firePromptFn then
+        local ok, err = pcall(function() firePromptFn(prompt, holdTime) end)
+        if ok then return true end
+        warn("[safeFirePrompt] Nativo falhou:", err)
+    end
+    local ok, vim = pcall(function() return game:GetService("VirtualInputManager") end)
+    if ok and vim then
+        pcall(function() vim:SendKeyEvent(true, Enum.KeyCode.E, false, game) end)
+        task.wait(holdTime)
+        pcall(function() vim:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
+        return true
+    end
+    return false
+end
+
+local function acharPrompt(model)
+    for _,desc in ipairs(model:GetDescendants()) do
+        if desc:IsA("ProximityPrompt") then return desc end
+    end
+end
+
+local function acharParteAlvo(model)
+    local try = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("RootPart") or model.PrimaryPart
+    if try and try:IsA("BasePart") then return try end
+    for _,v in ipairs(model:GetDescendants()) do
+        if v:IsA("BasePart") then return v end
+    end
+end
+
+-- Conversor de texto "10K", "2.5M" para número real
+local function parseNumberWithSuffix(str)
+    str = str:upper():gsub("%s+", "") -- maiúsculo e remove espaços
+    local num = tonumber(str:match("[%d%.]+")) or 0
+    if str:find("K") then
+        num = num * 1_000
+    elseif str:find("M") then
+        num = num * 1_000_000
+    elseif str:find("B") then
+        num = num * 1_000_000_000
+    end
+    return num
+end
+
+--========================================================--
+-- Lógica de seguir e interagir
+--========================================================--
+local function seguirEInteragirAteSumir(model, displayName)
+    local char, humanoid, hrp = waitForCharacterParts(5)
+    if not char or not humanoid or not hrp then return end
+
+    print(("[DEBUG] Iniciando follow no modelo: %s | DisplayName: %s"):format(model.Name, displayName))
+
+    local lastPrint, lastFireTime, tentativas = 0, 0, 0
+    local connection
+    connection = RunService.Heartbeat:Connect(function()
+        if not model or not model.Parent then
+            print("[DEBUG] Modelo removido — parando follow.")
+            connection:Disconnect()
+            return
+        end
+
+        local targetPart = acharParteAlvo(model)
+        if targetPart then
+            local dist = (hrp.Position - targetPart.Position).Magnitude
+            if tick() - lastPrint > 2 then
+                print(("[DEBUG] Distância do modelo: %.2f studs"):format(dist))
+                lastPrint = tick()
+            end
+            if dist > 2.2 then pcall(function() humanoid:MoveTo(targetPart.Position) end) end
+        end
+
+        local prompt = acharPrompt(model)
+        if prompt then
+            local promptPos
+            if prompt.Parent:IsA("BasePart") then
+                promptPos = prompt.Parent.Position
+            elseif prompt.Parent:IsA("Attachment") and prompt.Parent.Parent:IsA("BasePart") then
+                promptPos = prompt.Parent.Parent.Position
+            end
+            if promptPos and (hrp.Position - promptPos).Magnitude <= 10 then
+                if tentativas < 5 and tick() - lastFireTime >= 2 then
+                    print(("[DEBUG] Disparando ProximityPrompt (%d/5)"):format(tentativas+1))
+                    safeFirePrompt(prompt, 2)
+                    tentativas += 1
+                    lastFireTime = tick()
+                elseif tentativas >= 5 then
+                    print("[DEBUG] Limite de tentativas atingido — parando follow.")
+                    connection:Disconnect()
+                end
+            end
+        else
+            print("[DEBUG] ProximityPrompt sumiu — parando follow.")
+            connection:Disconnect()
+        end
+    end)
+end
+
+--========================================================--
+-- Monitor de MovingAnimals (detecção pelo Price)
+--========================================================--
+local movingAnimals = Workspace:WaitForChild("MovingAnimals")
+movingAnimals.ChildAdded:Connect(function(model)
+    if not model:IsA("Model") then return end
+    task.wait(0.5)
+
+    local infoFolder = model:FindFirstChild("HumanoidRootPart") and model.HumanoidRootPart:FindFirstChild("Info")
+    if not infoFolder then return end
+
+    -- DisplayName
+    local displayLabel = infoFolder:FindFirstChild("DisplayName", true)
+    local displayText = (displayLabel and displayLabel:IsA("TextLabel")) and displayLabel.Text or "N/A"
+
+    -- Price
+    local priceLabel = infoFolder:FindFirstChild("Price", true)
+    local priceText = (priceLabel and priceLabel:IsA("TextLabel")) and priceLabel.Text or "0"
+    local priceNumber = parseNumberWithSuffix(priceText)
+
+    print(("[DEBUG] Modelo detectado: %s | DisplayName: %s | Price: %s (num: %s)")
+        :format(model.Name, displayText, priceText, priceNumber))
+
+    if priceNumber > 20000 then
+        print("[DEBUG] Price acima de 20K — iniciando follow.")
+        task.spawn(function()
+            seguirEInteragirAteSumir(model, displayText)
+        end)
+    else
+        print("[DEBUG] Price abaixo de 20K — ignorado.")
+    end
+end)
+
+print("[Script] Pronto — agora usando detecção por Price > 20K.")
