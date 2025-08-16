@@ -211,8 +211,8 @@ end
 --========================================================--
 -- Monitor de Descendentes no Workspace
 --========================================================--
-Workspace.DescendantAdded:Connect(function(obj)
-    if not obj:IsA("Model") then return end
+    workspace.DescendantAdded:Connect(function(descendant)
+    if not descendant:IsA("Model") then return end
     task.wait(0.5)
 
     -- Tenta achar a pasta Info no HumanoidRootPart
