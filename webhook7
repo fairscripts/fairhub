@@ -258,4 +258,4 @@ end
     end
 end)
 
-print("[Script] Pronto — agora detecta Price, Generation, Rarity e envia via webhook.")
+print("[Script] Pronto — agora detecta Price, Generation, Rarity e envia via webhook. ATUALIZADO")
