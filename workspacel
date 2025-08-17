@@ -1,0 +1,71 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+
+-- Cria uma ScreenGui para segurar a interface
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ExecutorUI"
+screenGui.Parent = player.PlayerGui
+
+-- Cria um Frame (painel) para os botões
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 200, 0, 100)
+frame.Position = UDim2.new(0.5, -100, 0.5, -50)
+frame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+frame.BorderColor3 = Color3.new(0, 0, 0)
+frame.BorderSizePixel = 2
+frame.Parent = screenGui
+
+-- Cria o botão para o Workspace
+local workspaceButton = Instance.new("TextButton")
+workspaceButton.Size = UDim2.new(0.8, 0, 0.3, 0)
+workspaceButton.Position = UDim2.new(0.1, 0, 0.1, 0)
+workspaceButton.BackgroundColor3 = Color3.new(0.4, 0.6, 0.8)
+workspaceButton.Text = "Listar Workspace"
+workspaceButton.TextColor3 = Color3.new(1, 1, 1)
+workspaceButton.Parent = frame
+
+-- Cria o botão para o ReplicatedStorage
+local replicatedStorageButton = Instance.new("TextButton")
+replicatedStorageButton.Size = UDim2.new(0.8, 0, 0.3, 0)
+replicatedStorageButton.Position = UDim2.new(0.1, 0, 0.6, 0)
+replicatedStorageButton.BackgroundColor3 = Color3.new(0.8, 0.4, 0.6)
+replicatedStorageButton.Text = "Listar ReplicatedStorage"
+replicatedStorageButton.TextColor3 = Color3.new(1, 1, 1)
+replicatedStorageButton.Parent = frame
+
+-- Função para listar o conteúdo do Workspace
+local function listWorkspaceContent()
+    print("--- Conteúdo de Workspace ---")
+    local items = Workspace:GetChildren()
+    if #items > 0 then
+        for i, item in ipairs(items) do
+            print(string.format("[%d] %s (%s)", i, item.Name, item.ClassName))
+        end
+    else
+        print("A pasta Workspace está vazia.")
+    end
+    print("--------------------------")
+end
+
+-- Função para listar o conteúdo do ReplicatedStorage
+local function listReplicatedStorageContent()
+    print("--- Conteúdo de ReplicatedStorage ---")
+    local items = ReplicatedStorage:GetChildren()
+    if #items > 0 then
+        for i, item in ipairs(items) do
+            print(string.format("[%d] %s (%s)", i, item.Name, item.ClassName))
+        end
+    else
+        print("A pasta ReplicatedStorage está vazia.")
+    end
+    print("--------------------------")
+end
+
+-- Conecta as funções aos eventos de clique dos botões
+workspaceButton.MouseButton1Click:Connect(listWorkspaceContent)
+replicatedStorageButton.MouseButton1Click:Connect(listReplicatedStorageContent)
+
+print("Script de GUI injetado com sucesso! Procure pelo painel na tela.")
