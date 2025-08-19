@@ -1,0 +1,121 @@
+--========================================================--
+-- Monitor de Brainrots (Info + Modelo Aleatório) com DEBUG
+--========================================================--
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Tabelas para armazenar temporários
+local infoModels = {}     -- Infos em RenderedMovingAnimals
+local spawnedModels = {}  -- Modelos no Workspace com Prompt
+
+-- Função para parsear números tipo "1.2K"
+local function parseNumberWithSuffix(text)
+    if not text or text == "" then return 0 end
+    text = text:upper():gsub(",", ".")
+    local num = tonumber(text:match("%d+%.?%d*"))
+    if not num then return 0 end
+    if text:find("K") then
+        return math.floor(num * 1000)
+    elseif text:find("M") then
+        return math.floor(num * 1000000)
+    end
+    return math.floor(num)
+end
+
+-- Captura informações do InfoModel
+local function capturarInfos(infoModel)
+    print("[DEBUG] Capturando informações do InfoModel:", infoModel.Name)
+
+    local display = infoModel:FindFirstChild("DisplayName", true)
+    local price   = infoModel:FindFirstChild("Price", true)
+    local gen     = infoModel:FindFirstChild("Generation", true)
+    local rarity  = infoModel:FindFirstChild("Rarity", true)
+
+    local displayText = display and display:IsA("TextLabel") and display.Text or "N/A"
+    local priceText   = price and price:IsA("TextLabel") and price.Text or "0"
+    local genText     = gen and gen:IsA("TextLabel") and gen.Text or "N/A"
+    local rarityText  = rarity and rarity:IsA("TextLabel") and rarity.Text or "N/A"
+
+    local priceNumber = parseNumberWithSuffix(priceText)
+
+    print(string.format(
+        "[DEBUG] Infos capturadas -> Nome=%s | Price=%s (%d) | Gen=%s | Rarity=%s",
+        displayText, priceText, priceNumber, genText, rarityText
+    ))
+
+    return {
+        name = displayText,
+        priceText = priceText,
+        price = priceNumber,
+        gen = genText,
+        rarity = rarityText
+    }
+end
+
+-- Função para casar Info + Modelo com Prompt
+local function tentarCasar()
+    print("[DEBUG] Tentando casar modelos...")
+    for infoModel, infoData in pairs(infoModels) do
+        for model,_ in pairs(spawnedModels) do
+            print("[DEBUG] Casando Info ["..infoModel.Name.."] com Modelo ["..model.Name.."]")
+
+            local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
+            if prompt then
+                print("[DEBUG] Prompt encontrado dentro do modelo:", prompt.Name)
+            else
+                print("[DEBUG] Nenhum Prompt dentro do modelo!")
+            end
+
+            -- Aqui você poderia decidir se compra baseado no preço
+            if infoData.price > 1000 then
+                print("[DEBUG] Price acima do limite, iniciando interação automática!")
+                task.spawn(function()
+                    local tentativas = 0
+                    while model.Parent and tentativas < 5 do
+                        if prompt then
+                            print("[DEBUG] Tentando FirePrompt...", tentativas+1)
+                            pcall(function()
+                                fireproximityprompt(prompt)
+                            end)
+                        else
+                            print("[DEBUG] Prompt sumiu ou não existe mais.")
+                            break
+                        end
+                        tentativas += 1
+                        task.wait(2)
+                    end
+                end)
+            else
+                print("[DEBUG] Price abaixo do limite, ignorando compra.")
+            end
+
+            -- Remove os dois da tabela (já foram casados)
+            infoModels[infoModel] = nil
+            spawnedModels[model] = nil
+            return
+        end
+    end
+end
+
+-- Listener para novos InfoModels (em RenderedMovingAnimals)
+workspace.RenderedMovingAnimals.ChildAdded:Connect(function(obj)
+    if obj:IsA("Model") then
+        print("[DEBUG] Novo InfoModel detectado:", obj.Name)
+        local data = capturarInfos(obj)
+        infoModels[obj] = data
+        tentarCasar()
+    end
+end)
+
+-- Listener para novos modelos no Workspace
+workspace.ChildAdded:Connect(function(obj)
+    if obj:IsA("Model") and not obj:FindFirstChild("Humanoid") then
+        -- Evita players, pega só modelos aleatórios
+        print("[DEBUG] Novo Modelo Spawn detectado no Workspace:", obj.Name)
+        spawnedModels[obj] = true
+        tentarCasar()
+    end
+end)
+
+print("[Script] Pronto — monitorando RenderedMovingAnimals + Workspace")
