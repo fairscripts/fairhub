@@ -1,0 +1,185 @@
+--========================================================--
+-- Variáveis de controle
+--========================================================--
+local infoModels = {}    -- modelos de RenderedMovingAnimals
+local promptModels = {}  -- modelos com ID aleatório no Workspace
+
+--========================================================--
+-- Função que processa o par (Info + Prompt)
+--========================================================--
+local function processarBrainrot(infoModel, promptModel)
+    print("[DEBUG] Chamando processarBrainrot...")
+
+    if not infoModel or not infoModel.Parent then
+        print("[DEBUG] InfoModel inválido ou removido!")
+        return
+    end
+    if not promptModel or not promptModel.Parent then
+        print("[DEBUG] PromptModel inválido ou removido!")
+        return
+    end
+
+    print("[DEBUG] InfoModel =", infoModel.Name, "| PromptModel =", promptModel.Name)
+
+    -- Captura dados
+    local hrp = infoModel:FindFirstChild("HumanoidRootPart")
+    if not hrp then
+        print("[DEBUG] InfoModel não tem HumanoidRootPart!")
+        return
+    end
+    local infoFolder = hrp:FindFirstChild("Info")
+    if not infoFolder then
+        print("[DEBUG] InfoModel não tem pasta Info!")
+        return
+    end
+
+    print("[DEBUG] Pasta Info encontrada dentro do InfoModel.")
+
+    local displayLabel = infoFolder:FindFirstChild("DisplayName", true)
+    local displayText = (displayLabel and displayLabel:IsA("TextLabel")) and displayLabel.Text or "N/A"
+
+    local priceLabel = infoFolder:FindFirstChild("Price", true)
+    local priceText = (priceLabel and priceLabel:IsA("TextLabel")) and priceLabel.Text or "0"
+    local priceNumber = parseNumberWithSuffix(priceText)
+
+    local genLabel = infoFolder:FindFirstChild("Generation", true)
+    local genText = (genLabel and genLabel:IsA("TextLabel")) and genLabel.Text or "N/A"
+
+    local rarityLabel = infoFolder:FindFirstChild("Rarity", true)
+    local rarityText = (rarityLabel and rarityLabel:IsA("TextLabel")) and rarityLabel.Text or "N/A"
+
+    print(("[DEBUG] Info capturado: Nome=%s | Price=%s (%d) | Gen=%s | Rarity=%s")
+        :format(displayText, priceText, priceNumber, genText, rarityText))
+
+    -- Envia msg de spawn
+    sendWebhook(string.format(
+        "🚨 Brainrot Spawnado!\nNome: %s\nPrice: %s\nGeneration: %s\nRarity: %s\n",
+        displayText, priceText, genText, rarityText
+    ))
+
+    -- Decide se compra
+    if priceNumber > limitePrice then
+        print(("[DEBUG] Price (%d) acima do limite (%d) — iniciando follow.")
+            :format(priceNumber, limitePrice))
+
+        sendWebhookR(string.format(
+            "🚨 Brainrot comprado!\nNome: %s\nPrice: %s\nGeneration: %s\nRarity: %s",
+            displayText, priceText, genText, rarityText
+        ))
+
+        -- Segue Info e interage com Prompt
+        task.spawn(function()
+            print("[DEBUG] Chamando seguirEInteragirAteSumir...")
+            seguirEInteragirAteSumir(infoModel, displayText, promptModel)
+        end)
+    else
+        print(("[DEBUG] Price (%d) abaixo ou igual ao limite (%d) — ignorado.")
+            :format(priceNumber, limitePrice))
+    end
+end
+
+--========================================================--
+-- Função seguir + interagir
+--========================================================--
+function seguirEInteragirAteSumir(infoModel, displayName, promptModel)
+    print("[DEBUG] Entrando em seguirEInteragirAteSumir")
+
+    local char, humanoid, hrp = waitForCharacterParts(5)
+    if not char or not humanoid or not hrp then
+        print("[DEBUG] Não consegui pegar o Character do player!")
+        return
+    end
+
+    print(("[DEBUG] Seguindo modelo: %s | DisplayName: %s"):format(infoModel.Name, displayName))
+
+    local lastPrint, lastFireTime, tentativas = 0, 0, 0
+    local connection
+    connection = RunService.Heartbeat:Connect(function()
+        if not infoModel or not infoModel.Parent then
+            print("[DEBUG] InfoModel removido — parando follow.")
+            connection:Disconnect()
+            return
+        end
+
+        local targetPart = acharParteAlvo(infoModel)
+        if targetPart then
+            local dist = (hrp.Position - targetPart.Position).Magnitude
+            if tick() - lastPrint > 2 then
+                print(("[DEBUG] Distância do modelo: %.2f studs"):format(dist))
+                lastPrint = tick()
+            end
+            if dist > 2.2 then
+                print("[DEBUG] Movendo humanoid até targetPart...")
+                pcall(function() humanoid:MoveTo(targetPart.Position) end)
+            end
+        else
+            print("[DEBUG] Nenhuma parte alvo encontrada no modelo INFO!")
+        end
+
+        local prompt = acharPrompt(promptModel)
+        if prompt then
+            local promptPos
+            if prompt.Parent:IsA("BasePart") then
+                promptPos = prompt.Parent.Position
+            elseif prompt.Parent:IsA("Attachment") and prompt.Parent.Parent:IsA("BasePart") then
+                promptPos = prompt.Parent.Parent.Position
+            end
+            if promptPos then
+                local distPrompt = (hrp.Position - promptPos).Magnitude
+                print(("[DEBUG] Distância até Prompt: %.2f studs"):format(distPrompt))
+                if distPrompt <= 10 then
+                    if tentativas < 5 and tick() - lastFireTime >= 2 then
+                        print(("[DEBUG] Disparando ProximityPrompt (%d/5)"):format(tentativas+1))
+                        safeFirePrompt(prompt, 2)
+                        tentativas += 1
+                        lastFireTime = tick()
+                    elseif tentativas >= 5 then
+                        print("[DEBUG] Limite de tentativas atingido — parando follow.")
+                        connection:Disconnect()
+                    end
+                end
+            else
+                print("[DEBUG] Prompt encontrado mas sem posição válida!")
+            end
+        else
+            print("[DEBUG] Nenhum Prompt encontrado dentro do PromptModel.")
+        end
+    end)
+end
+
+--========================================================--
+-- Detectar novos modelos
+--========================================================--
+game.Workspace.ChildAdded:Connect(function(obj)
+    task.wait(0.3)
+    if obj:IsA("Model") then
+        print("[DEBUG] Novo modelo detectado no Workspace:", obj.Name)
+        promptModels[obj] = true
+
+        for info,_ in pairs(infoModels) do
+            print("[DEBUG] Casando INFO:", info.Name, "com PROMPT:", obj.Name)
+            processarBrainrot(info, obj)
+            infoModels[info] = nil
+            promptModels[obj] = nil
+            break
+        end
+    end
+end)
+
+game.Workspace:WaitForChild("RenderedMovingAnimals").ChildAdded:Connect(function(obj)
+    task.wait(0.3)
+    if obj:IsA("Model") then
+        print("[DEBUG] Novo modelo detectado em RenderedMovingAnimals:", obj.Name)
+        infoModels[obj] = true
+
+        for prompt,_ in pairs(promptModels) do
+            print("[DEBUG] Casando INFO:", obj.Name, "com PROMPT:", prompt.Name)
+            processarBrainrot(obj, prompt)
+            infoModels[obj] = nil
+            promptModels[prompt] = nil
+            break
+        end
+    end
+end)
+
+print("[Script] Pronto — monitorando RenderedMovingAnimals (infos) e Workspace (prompts) com DEBUG total!")
