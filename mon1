@@ -1,0 +1,77 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+
+-- Define a pasta que será monitorada
+local animalModelsFolder = Workspace:FindFirstChild("RenderedMovingAnimals")
+
+-- Flag para evitar que o evento seja conectado múltiplas vezes
+local isMonitoring = false
+
+-- Cria a ScreenGui para a interface
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AnimalMonitorUI"
+screenGui.Parent = player.PlayerGui
+
+-- Cria o painel principal
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 250, 0, 70)
+frame.Position = UDim2.new(0.5, -125, 0.5, -35)
+frame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+frame.BorderSizePixel = 2
+frame.Parent = screenGui
+
+-- Cria o botão para ativar o monitor
+local monitorButton = Instance.new("TextButton")
+monitorButton.Size = UDim2.new(0.8, 0, 0.5, 0)
+monitorButton.Position = UDim2.new(0.1, 0, 0.25, 0)
+monitorButton.BackgroundColor3 = Color3.new(0.3, 0.7, 0.5)
+monitorButton.Text = "Ativar Monitor de Animais"
+monitorButton.TextColor3 = Color3.new(1, 1, 1)
+monitorButton.Font = Enum.Font.SourceSansBold
+monitorButton.Parent = frame
+
+-- Função para monitorar a criação de novos modelos de animais
+local function startAnimalMonitor()
+    if not animalModelsFolder then
+        print("Erro: A pasta 'RenderedMovingAnimals' não foi encontrada no Workspace.")
+        print("Verifique se o jogo em que você está possui essa pasta.")
+        return
+    end
+
+    if isMonitoring then
+        print("O monitor de animais já está ativo!")
+        return
+    end
+
+    isMonitoring = true
+    monitorButton.BackgroundColor3 = Color3.new(0.7, 0.3, 0.3) -- Muda a cor do botão para indicar que está ativo
+    monitorButton.Text = "Monitor ATIVO"
+
+    print("--- Monitor de 'RenderedMovingAnimals' ativado! ---")
+    print("O script agora está observando a criação de novos modelos de animais.")
+
+    -- Conecta o evento ChildAdded à pasta específica
+    animalModelsFolder.ChildAdded:Connect(function(child)
+        if child:IsA("Model") then
+            print("\n-------------------------------")
+            print("Novo modelo de animal detectado: " .. child.Name)
+            print("Localização: " .. child:GetFullName())
+
+            local descendants = child:GetDescendants()
+            if #descendants > 0 then
+                print("Conteúdo do modelo " .. child.Name .. ":")
+                for i, descendant in ipairs(descendants) do
+                    print(string.format("  [%d] %s (Tipo: %s)", i, descendant.Name, descendant.ClassName))
+                end
+            else
+                print("O modelo " .. child.Name .. " está vazio.")
+            end
+            print("-------------------------------\n")
+        end
+    end)
+end
+
+-- Conecta a função ao evento de clique do botão
+monitorButton.MouseButton1Click:Connect(startAnimalMonitor)
