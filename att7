@@ -1,0 +1,467 @@
+--========================================================--
+-- Configurações iniciais
+--========================================================--
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local HttpService = game:GetService("HttpService")
+
+--========================================================--
+-- Variáveis de controle
+--========================================================--
+local limitePrice = 20000 -- valor inicial do limite
+local webhookURL  = "https://discord.com/api/webhooks/1405879934462853190/DV9acgRMAr8vPjAfBMV7RRbnQjVgMtK-D7mgmH0bxb-fgMfVl5tSeu6u7MPlit1lWi9U"
+local webhookRURL = "https://discord.com/api/webhooks/1405887655996162058/z4ENqhWMvY1lCQNAcWZrBBcu-P2wpy5KPkRuN04eQmzPXpeMkVZPoDkbUYW_Got0q-ln"
+
+--========================================================--
+-- Mini UI pra mudar limite (com debug)
+--========================================================--
+local gui = Instance.new("ScreenGui")
+gui.Name = "PriceLimitUI"
+gui.Parent = game:GetService("CoreGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 200, 0, 72)
+frame.Position = UDim2.new(1, -210, 1, -82)
+frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -10, 0, 22)
+title.Position = UDim2.new(0, 5, 0, 4)
+title.BackgroundTransparency = 1
+title.Text = "Limite de Price"
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 18
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Parent = frame
+
+local box = Instance.new("TextBox")
+box.Size = UDim2.new(1, -10, 0, 34)
+box.Position = UDim2.new(0, 5, 0, 30)
+box.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+box.TextColor3 = Color3.fromRGB(255, 255, 255)
+box.Font = Enum.Font.SourceSans
+box.TextSize = 18
+box.Text = tostring(limitePrice)
+box.Parent = frame
+
+box.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local value = tonumber(box.Text)
+        if value then
+            limitePrice = value
+            print("[UI] Limite de Price alterado para:", limitePrice)
+        else
+            box.Text = tostring(limitePrice)
+        end
+    end
+end)
+
+--========================================================--
+-- Auxiliares
+--========================================================--
+local function waitForCharacterParts(timeout)
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local okHum = pcall(function() char:WaitForChild("Humanoid", timeout) end)
+    local okHRP = pcall(function() char:WaitForChild("HumanoidRootPart", timeout) end)
+    return char,
+           (okHum and char:FindFirstChildOfClass("Humanoid")) or nil,
+           (okHRP and char:FindFirstChild("HumanoidRootPart")) or nil
+end
+
+-- compat de request para webhook
+local function do_request(payload)
+    local req = rawget(getfenv(), "http_request")
+              or rawget(getfenv(), "request")
+              or (syn and syn.request)
+    if not req then
+        warn("[WEBHOOK] Nenhuma função http_request/request/syn.request disponível.")
+        return
+    end
+    local ok, err = pcall(function() 
+        req({
+            Url = payload.Url,
+            Method = payload.Method or "POST",
+            Headers = payload.Headers or {["Content-Type"] = "application/json"},
+            Body = payload.Body or ""
+        })
+    end)
+    if not ok then
+        warn("[WEBHOOK] Falha ao enviar:", err)
+    end
+end
+
+local function sendWebhook(message)
+    if not webhookURL or webhookURL == "" then return end
+    do_request({
+        Url = webhookURL,
+        Method = "POST",
+        Headers = {["Content-Type"] = "application/json"},
+        Body = HttpService:JSONEncode({ content = message })
+    })
+end
+
+local function sendWebhookR(message)
+    if not webhookRURL or webhookRURL == "" then return end
+    do_request({
+        Url = webhookRURL,
+        Method = "POST",
+        Headers = {["Content-Type"] = "application/json"},
+        Body = HttpService:JSONEncode({ content = message })
+    })
+end
+
+-- fire proximity compat
+local firePromptFn
+if typeof(fireproximityprompt) == "function" then
+    firePromptFn = fireproximityprompt
+elseif typeof(fireProximityPrompt) == "function" then
+    firePromptFn = fireProximityPrompt
+end
+
+local function safeFirePrompt(prompt)
+    if not prompt or not prompt:IsA("ProximityPrompt") then 
+        print("[PROMPT] safeFirePrompt recebeu algo inválido:", prompt)
+        return false 
+    end
+    local hold = tonumber(prompt.HoldDuration) or 0
+    local md   = tonumber(prompt.MaxActivationDistance) or 10
+    print(("[PROMPT] Tentando disparar | HoldDuration=%.2f | MaxDist=%.1f | Enabled=%s | ObjText=%s")
+        :format(hold, md, tostring(prompt.Enabled), tostring(prompt.ObjectText)))
+
+    if not prompt.Enabled then
+        print("[PROMPT] Abortado: prompt.Enabled = false")
+        return false
+    end
+
+    if firePromptFn then
+        local ok, err = pcall(function()
+            -- alguns executores aceitam (prompt, duração), outros só (prompt)
+            if hold > 0 then
+                firePromptFn(prompt, hold + 0.05)
+            else
+                firePromptFn(prompt)
+            end
+        end)
+        if ok then 
+            print("[PROMPT] Disparo via função nativa OK.")
+            return true 
+        end
+        warn("[PROMPT] Nativo falhou:", err)
+    end
+
+    -- fallback por tecla (pode falhar se o jogo usa outra tecla)
+    local okVIM, vim = pcall(function() return game:GetService("VirtualInputManager") end)
+    if okVIM and vim then
+        print("[PROMPT] Disparo por VirtualInputManager (tecla E).")
+        pcall(function() vim:SendKeyEvent(true, Enum.KeyCode.E, false, game) end)
+        task.wait(hold > 0 and hold or 0.2)
+        pcall(function() vim:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
+        return true
+    end
+
+    print("[PROMPT] Sem método disponível para disparar.")
+    return false
+end
+
+local function acharParteAlvoDoPrompt(prompt)
+    if not prompt then return nil end
+    if prompt.Parent:IsA("BasePart") then
+        return prompt.Parent
+    elseif prompt.Parent:IsA("Attachment") and prompt.Parent.Parent:IsA("BasePart") then
+        return prompt.Parent.Parent
+    end
+    return nil
+end
+
+local function parseNumberWithSuffix(str)
+    str = tostring(str or ""):upper():gsub("%s+", "")
+    local num = tonumber(str:match("[%d%.]+")) or 0
+    if str:find("K") then
+        num = num * 1000
+    elseif str:find("M") then
+        num = num * 1000000
+    elseif str:find("B") then
+        num = num * 1000000000
+    end
+    return num
+end
+
+--========================================================--
+-- Pairing: junta Info (RenderedMovingAnimals) com Prompt (Workspace)
+--========================================================--
+local RenderedMovingAnimals = Workspace:FindFirstChild("RenderedMovingAnimals")
+if not RenderedMovingAnimals then
+    print("[PAIR] Pasta 'RenderedMovingAnimals' não encontrada agora; vou continuar só com Workspace e tento achar depois.")
+    task.spawn(function()
+        local found = Workspace:WaitForChild("RenderedMovingAnimals", 15)
+        if found then
+            RenderedMovingAnimals = found
+            print("[PAIR] 'RenderedMovingAnimals' apareceu, vou monitorar também.")
+        end
+    end)
+end
+
+-- registry por ID
+local REG = {}
+-- REG[id] = {
+--    infoReady=true/false,
+--    displayName, priceText, priceNumber, genText, rarityText,
+--    infoRoot, infoPart, infoFolder,
+--    promptReady=true/false,
+--    prompt, promptRoot, promptBasePart
+-- }
+
+local function getRootUnderContainers(inst)
+    -- Sobe até o objeto que é filho direto do Workspace ou do RenderedMovingAnimals
+    local cur = inst
+    while cur and cur.Parent do
+        if cur.Parent == Workspace or (RenderedMovingAnimals and cur.Parent == RenderedMovingAnimals) then
+            return cur
+        end
+        cur = cur.Parent
+    end
+    return inst
+end
+
+local function ensureReg(id)
+    REG[id] = REG[id] or {}
+    return REG[id]
+end
+
+local function dumpInfo(id, tag)
+    local r = REG[id]
+    if not r then return end
+    print(("[PAIR][%s] ID=%s | infoReady=%s | promptReady=%s"):format(tag or "DBG", id, tostring(r.infoReady), tostring(r.promptReady)))
+    if r.infoReady then
+        print(("[PAIR]   Info: Name=%s | Price=%s(%.0f) | Gen=%s | Rarity=%s")
+            :format(tostring(r.displayName), tostring(r.priceText), tonumber(r.priceNumber or 0), tostring(r.genText), tostring(r.rarityText)))
+    end
+    if r.promptReady then
+        local pr = r.prompt
+        print(("[PAIR]   Prompt: Enabled=%s | Hold=%.2f | MaxDist=%.1f | Root=%s")
+            :format(tostring(pr and pr.Enabled), tonumber(pr and pr.HoldDuration or 0), tonumber(pr and pr.MaxActivationDistance or 0), tostring(r.promptRoot and r.promptRoot:GetFullName())))
+    end
+end
+
+local function onPairReady(id)
+    local r = REG[id]
+    if not r or not r.infoReady or not r.promptReady then return end
+
+    dumpInfo(id, "READY")
+
+    -- webhook spawn
+    local msg = string.format(
+        "🚨 Brainrot Spawnado!\nID: %s\nNome: %s\nPrice: %s\nGeneration: %s\nRarity: %s",
+        tostring(id), tostring(r.displayName), tostring(r.priceText), tostring(r.genText), tostring(r.rarityText)
+    )
+    sendWebhook(msg)
+
+    if (tonumber(r.priceNumber) or 0) > limitePrice then
+        print(("[PAIR] Price %.0f > limite %d — vou seguir e tentar interagir o PROMPT desse ID."):format(r.priceNumber or 0, limitePrice))
+
+        local msg2 = string.format(
+            "🚨 Brainrot comprado!\nID: %s\nNome: %s\nPrice: %s\nGeneration: %s\nRarity: %s",
+            tostring(id), tostring(r.displayName), tostring(r.priceText), tostring(r.genText), tostring(r.rarityText)
+        )
+        sendWebhookR(msg2)
+
+        -- seguir e disparar o prompt específico desse ID
+        task.spawn(function()
+            local char, humanoid, hrp = waitForCharacterParts(5)
+            if not (char and humanoid and hrp) then
+                print("[FOLLOW] Sem humanoid/HRP do jogador. Abortando.")
+                return
+            end
+
+            local prompt = r.prompt
+            if not (prompt and prompt.Parent) then
+                print("[FOLLOW] Prompt não existe mais. Abortando.")
+                return
+            end
+
+            local base = r.promptBasePart or acharParteAlvoDoPrompt(prompt)
+            if not base then
+                print("[FOLLOW] Não achei BasePart do prompt. Abortando.")
+                return
+            end
+
+            print("[FOLLOW] Iniciando follow até o prompt. BasePart:", base:GetFullName())
+            local tentativas, lastPrint = 0, 0
+            local conn
+            conn = RunService.Heartbeat:Connect(function()
+                if not prompt or not prompt.Parent then
+                    print("[FOLLOW] Prompt destruído. Encerrando.")
+                    conn:Disconnect()
+                    return
+                end
+
+                -- mover até perto do prompt
+                local dist = (hrp.Position - base.Position).Magnitude
+                if tick() - lastPrint > 1 then
+                    print(("[FOLLOW] Distância até o prompt: %.2f studs | Enabled=%s")
+                        :format(dist, tostring(prompt.Enabled)))
+                    lastPrint = tick()
+                end
+
+                if dist > 2.5 then
+                    pcall(function() humanoid:MoveTo(base.Position) end)
+                end
+
+                -- se estiver dentro do range, tentar disparar
+                local md = tonumber(prompt.MaxActivationDistance) or 10
+                if dist <= (md + 0.5) then
+                    if tentativas < 10 then
+                        tentativas += 1
+                        print(("[FOLLOW] Tentando disparar prompt (%d/10)..."):format(tentativas))
+                        local ok = safeFirePrompt(prompt)
+                        if ok then
+                            print("[FOLLOW] Disparo enviado. Vou aguardar 0.6s e tentar novamente se ainda existir.")
+                        end
+                        task.wait(0.6)
+                    else
+                        print("[FOLLOW] Limite de tentativas atingido. Encerrando.")
+                        conn:Disconnect()
+                    end
+                end
+            end)
+        end)
+    else
+        print(("[PAIR] Price %.0f <= limite %d — ignorando interação automática."):format(r.priceNumber or 0, limitePrice))
+    end
+end
+
+--========================================================--
+-- Coleta de INFO (em (ID).Part.Info) e PROMPT (no (ID) do Workspace)
+--========================================================--
+local function tryCaptureInfo(root)
+    -- esperamos root.Part.Info
+    if not root or not root.Parent then return false end
+    local part = root:FindFirstChild("Part")
+    if not (part and part:IsA("BasePart")) then return false end
+
+    local info = part:FindFirstChild("Info")
+    if not (info and info:IsA("Folder")) then return false end
+
+    local id = tostring(root.Name)
+    local reg = ensureReg(id)
+
+    local displayLabel = info:FindFirstChild("DisplayName", true)
+    local priceLabel   = info:FindFirstChild("Price", true)
+    local genLabel     = info:FindFirstChild("Generation", true)
+    local rarityLabel  = info:FindFirstChild("Rarity", true)
+
+    local displayText = (displayLabel and displayLabel:IsA("TextLabel")) and displayLabel.Text or "N/A"
+    local priceText   = (priceLabel   and priceLabel:IsA("TextLabel"))   and priceLabel.Text   or "0"
+    local genText     = (genLabel     and genLabel:IsA("TextLabel"))     and genLabel.Text     or "N/A"
+    local rarityText  = (rarityLabel  and rarityLabel:IsA("TextLabel"))  and rarityLabel.Text  or "N/A"
+
+    reg.infoReady   = true
+    reg.displayName = displayText
+    reg.priceText   = priceText
+    reg.priceNumber = parseNumberWithSuffix(priceText)
+    reg.genText     = genText
+    reg.rarityText  = rarityText
+    reg.infoRoot    = root
+    reg.infoPart    = part
+    reg.infoFolder  = info
+
+    print(("[INFO] Capturado em %s | Name=%s | Price=%s(%.0f) | Gen=%s | Rarity=%s")
+        :format(root:GetFullName(), displayText, priceText, reg.priceNumber or 0, genText, rarityText))
+
+    dumpInfo(id, "AFTER-INFO")
+    onPairReady(id)
+    return true
+end
+
+local function tryCapturePrompt(root)
+    if not root or not root.Parent then return false end
+
+    -- achar um ProximityPrompt dentro do root
+    local promptFound
+    for _, d in ipairs(root:GetDescendants()) do
+        if d:IsA("ProximityPrompt") then
+            promptFound = d
+            break
+        end
+    end
+    if not promptFound then return false end
+
+    local id  = tostring(root.Name)
+    local reg = ensureReg(id)
+    reg.promptReady   = true
+    reg.prompt        = promptFound
+    reg.promptRoot    = root
+    reg.promptBasePart= acharParteAlvoDoPrompt(promptFound)
+
+    print(("[PROMPT] Capturado em %s | Enabled=%s | Hold=%.2f | MaxDist=%.1f | BasePart=%s")
+        :format(root:GetFullName(), tostring(promptFound.Enabled), tonumber(promptFound.HoldDuration or 0), tonumber(promptFound.MaxActivationDistance or 0), tostring(reg.promptBasePart and reg.promptBasePart:GetFullName() or "nil")))
+
+    dumpInfo(id, "AFTER-PROMPT")
+    onPairReady(id)
+    return true
+end
+
+-- Decide se um root “parece” ser de Info ou de Prompt:
+local function classifyAndCapture(inst)
+    if not inst or not inst.Parent then return end
+    local root = getRootUnderContainers(inst)
+    if not root or not root.Parent then return end
+
+    -- Heurísticas:
+    -- - Se tem Part.Info -> é Info
+    -- - Se tem ProximityPrompt -> é Prompt
+    local captured = false
+    captured = tryCaptureInfo(root)
+    if not captured then
+        captured = tryCapturePrompt(root)
+    end
+
+    if not captured then
+        -- logs rápidos
+        if root ~= inst then
+            print(("[SCAN] Viu %s -> root %s, mas ainda não casou Info/Prompt."):format(inst:GetFullName(), root:GetFullName()))
+        else
+            print(("[SCAN] Viu %s, aguardando subitens..."):format(inst:GetFullName()))
+        end
+    end
+end
+
+--========================================================--
+-- Conexões de monitoramento
+--========================================================--
+local function hookContainer(container, label)
+    if not container then return end
+    print(("[HOOK] Monitorando %s: %s"):format(label, container:GetFullName()))
+
+    -- Quando entrar algo novo (qualquer nível)
+    container.DescendantAdded:Connect(function(inst)
+        -- debounce simples: espera 0.1s pra estrutura aparecer
+        task.wait(0.1)
+        classifyAndCapture(inst)
+    end)
+
+    -- Para itens que já existiam
+    for _, inst in ipairs(container:GetDescendants()) do
+        classifyAndCapture(inst)
+    end
+end
+
+hookContainer(Workspace, "Workspace")
+if RenderedMovingAnimals then
+    hookContainer(RenderedMovingAnimals, "RenderedMovingAnimals")
+else
+    -- quando aparecer, conecta
+    task.spawn(function()
+        local r = Workspace:WaitForChild("RenderedMovingAnimals", 30)
+        if r then hookContainer(r, "RenderedMovingAnimals(late)") end
+    end)
+end
+
+print("[Script] Pronto — monitorando Workspace e, quando houver, RenderedMovingAnimals. Emparelhando (ID).Part.Info <-> (ID com ProximityPrompt).")
