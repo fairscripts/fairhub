@@ -1,0 +1,306 @@
+--========================================================--
+-- Configurações iniciais
+--========================================================--
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local HttpService = game:GetService("HttpService")
+
+--========================================================--
+-- Variáveis de controle
+--========================================================--
+local limitePrice = 20000 -- valor inicial do limite
+local webhookURL = "https://discord.com/api/webhooks/1405879934462853190/DV9acgRMAr8vPjAfBMV7RRbnQjVgMtK-D7mgmH0bxb-fgMfVl5tSeu6u7MPlit1lWi9U"
+local webhookRURL = "https://discord.com/api/webhooks/1405887655996162058/z4ENqhWMvY1lCQNAcWZrBBcu-P2wpy5KPkRuN04eQmzPXpeMkVZPoDkbUYW_Got0q-ln"
+
+--========================================================--
+-- Criar UI para mudar limite
+--========================================================--
+local gui = Instance.new("ScreenGui")
+gui.Name = "PriceLimitUI"
+gui.Parent = game:GetService("CoreGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 180, 0, 60)
+frame.Position = UDim2.new(1, -190, 1, -70) -- canto inferior direito
+frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 20)
+title.BackgroundTransparency = 1
+title.Text = "Limite de Price"
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 18
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Parent = frame
+
+local box = Instance.new("TextBox")
+box.Size = UDim2.new(1, -10, 0, 30)
+box.Position = UDim2.new(0, 5, 0, 25)
+box.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+box.TextColor3 = Color3.fromRGB(255, 255, 255)
+box.Font = Enum.Font.SourceSans
+box.TextSize = 18
+box.Text = tostring(limitePrice)
+box.Parent = frame
+
+box.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local value = tonumber(box.Text)
+        if value then
+            limitePrice = value
+            print("[UI] Limite de Price alterado para:", limitePrice)
+        else
+            box.Text = tostring(limitePrice)
+        end
+    end
+end)
+
+--========================================================--
+-- Funções auxiliares
+--========================================================--
+local function waitForCharacterParts(timeout)
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local ok = pcall(function() char:WaitForChild("Humanoid", timeout) end)
+    local ok2 = pcall(function() char:WaitForChild("HumanoidRootPart", timeout) end)
+    return char, (ok and char:FindFirstChildOfClass("Humanoid")), (ok2 and char:FindFirstChild("HumanoidRootPart"))
+end
+
+local firePromptFn
+if typeof(fireproximityprompt) == "function" then
+    firePromptFn = fireproximityprompt
+elseif typeof(fireProximityPrompt) == "function" then
+    firePromptFn = fireProximityPrompt
+end
+
+local function safeFirePrompt(prompt, holdTime)
+    holdTime = holdTime or 2
+    if not prompt or not prompt:IsA("ProximityPrompt") then return false end
+    if firePromptFn then
+        local ok, err = pcall(function() firePromptFn(prompt, holdTime) end)
+        if ok then return true end
+        warn("[safeFirePrompt] Nativo falhou:", err)
+    end
+    local ok, vim = pcall(function() return game:GetService("VirtualInputManager") end)
+    if ok and vim then
+        pcall(function() vim:SendKeyEvent(true, Enum.KeyCode.E, false, game) end)
+        task.wait(holdTime)
+        pcall(function() vim:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
+        return true
+    end
+    return false
+end
+
+local function acharPrompt(model)
+    for _,desc in ipairs(model:GetDescendants()) do
+        if desc:IsA("ProximityPrompt") then return desc end
+    end
+end
+
+local function acharParteAlvo(model)
+    local try = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("RootPart") or model.PrimaryPart
+    if try and try:IsA("BasePart") then return try end
+    for _,v in ipairs(model:GetDescendants()) do
+        if v:IsA("BasePart") then return v end
+    end
+end
+
+local function parseNumberWithSuffix(str)
+    str = str:upper():gsub("%s+", "")
+    local num = tonumber(str:match("[%d%.]+")) or 0
+    if str:find("K") then
+        num = num * 1_000
+    elseif str:find("M") then
+        num = num * 1_000_000
+    elseif str:find("B") then
+        num = num * 1_000_000_000
+    end
+    return num
+end
+
+--========================================================--
+-- Função para enviar webhook
+--========================================================--
+local function sendWebhook(message)
+    if not webhookURL or webhookURL == "" then return end
+    pcall(function()
+        http_request({
+            Url = webhookURL,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode({content = message})
+        })
+    end)
+end
+
+--========================================================--
+-- Função para enviar webhook raro
+--========================================================--
+local function sendWebhookR(message)
+    if not webhookRURL or webhookRURL == "" then return end
+    pcall(function()
+        http_request({
+            Url = webhookRURL,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode({content = message})
+        })
+    end)
+end
+
+--========================================================--
+-- Lógica de seguir e interagir
+--========================================================--
+local function seguirEInteragirAteSumir(model, displayName)
+    local char, humanoid, hrp = waitForCharacterParts(5)
+    if not char or not humanoid or not hrp then return end
+
+    print(("[DEBUG] Iniciando follow no modelo: %s | DisplayName: %s"):format(model.Name, displayName))
+
+    local lastPrint, lastFireTime, tentativas = 0, 0, 0
+    local connection
+    connection = RunService.Heartbeat:Connect(function()
+        if not model or not model.Parent then
+            print("[DEBUG] Modelo removido — parando follow.")
+            connection:Disconnect()
+            return
+        end
+
+        local targetPart = acharParteAlvo(model)
+        if targetPart then
+            local dist = (hrp.Position - targetPart.Position).Magnitude
+            if tick() - lastPrint > 2 then
+                print(("[DEBUG] Distância do modelo: %.2f studs"):format(dist))
+                lastPrint = tick()
+            end
+            if dist > 2.2 then pcall(function() humanoid:MoveTo(targetPart.Position) end) end
+        end
+
+        local prompt = acharPrompt(model)
+        if prompt then
+            local promptPos
+            if prompt.Parent:IsA("BasePart") then
+                promptPos = prompt.Parent.Position
+            elseif prompt.Parent:IsA("Attachment") and prompt.Parent.Parent:IsA("BasePart") then
+                promptPos = prompt.Parent.Parent.Position
+            end
+            if promptPos and (hrp.Position - promptPos).Magnitude <= 10 then
+                if tentativas < 5 and tick() - lastFireTime >= 2 then
+                    print(("[DEBUG] Disparando ProximityPrompt (%d/5)"):format(tentativas+1))
+                    safeFirePrompt(prompt, 2)
+                    tentativas += 1
+                    lastFireTime = tick()
+                elseif tentativas >= 5 then
+                    print("[DEBUG] Limite de tentativas atingido — parando follow.")
+                    connection:Disconnect()
+                end
+            end
+        else
+            print("[DEBUG] ProximityPrompt sumiu — parando follow.")
+            connection:Disconnect()
+        end
+    end)
+end
+
+--========================================================--
+-- Monitor de Descendentes no Workspace (corrigido + Prompt certo)
+--========================================================--
+workspace.ChildAdded:Connect(function(model)
+    if not model:IsA("Model") then return end
+    task.wait(0.5)
+
+    print("[DEBUG] Novo modelo detectado:", model.Name)
+
+    -- Procura um "Part" dentro do modelo
+    local part = model:FindFirstChild("Part")
+    if not part then
+        print("[DEBUG] Nenhum 'Part' encontrado dentro de", model.Name)
+        return
+    end
+
+    -- Dentro do Part deve existir a pasta Info
+    local infoFolder = part:FindFirstChild("Info")
+    if not infoFolder then
+        print("[DEBUG] Nenhuma pasta 'Info' encontrada dentro de", part.Name)
+        return
+    end
+
+    print("[DEBUG] Pasta Info encontrada em:", part.Name)
+
+    -- Captura informações (com checagem extra)
+    local displayLabel = infoFolder:FindFirstChild("DisplayName", true)
+    local displayText = (displayLabel and displayLabel:IsA("TextLabel")) and displayLabel.Text or "N/A"
+    print("[DEBUG] DisplayName encontrado:", displayText)
+
+    local priceLabel = infoFolder:FindFirstChild("Price", true)
+    local priceText = (priceLabel and priceLabel:IsA("TextLabel")) and priceLabel.Text or "0"
+    local priceNumber = parseNumberWithSuffix(priceText)
+    print("[DEBUG] Price encontrado:", priceText, "-> Número:", priceNumber)
+
+    local genLabel = infoFolder:FindFirstChild("Generation", true)
+    local genText = (genLabel and genLabel:IsA("TextLabel")) and genLabel.Text or "N/A"
+    print("[DEBUG] Generation encontrado:", genText)
+
+    local rarityLabel = infoFolder:FindFirstChild("Rarity", true)
+    local rarityText = (rarityLabel and rarityLabel:IsA("TextLabel")) and rarityLabel.Text or "N/A"
+    print("[DEBUG] Rarity encontrado:", rarityText)
+
+    print(("[DEBUG] Modelo completo -> %s | DisplayName: %s | Price: %s | Generation: %s | Rarity: %s")
+        :format(model.Name, displayText, priceText, genText, rarityText))
+
+-- Procura especificamente o ProximityPrompt dentro do Model (com espera)
+local prompt = model:FindFirstChildWhichIsA("ProximityPrompt")
+if not prompt then
+    print("[DEBUG] ProximityPrompt ainda não existe, aguardando...")
+    -- Espera até 3 segundos por ele
+    local start = tick()
+    repeat
+        prompt = model:FindFirstChildWhichIsA("ProximityPrompt")
+        task.wait(0.1)
+    until prompt or tick() - start > 3
+end
+
+if prompt then
+    print("[DEBUG] ProximityPrompt encontrado em:", model.Name)
+else
+    print("[DEBUG] Nenhum ProximityPrompt encontrado em:", model.Name)
+end
+
+
+    -- Envia para o Discord
+    local msg = string.format(
+        "🚨 Brainrot Spawnado!\nNome: %s\nPrice: %s\nGeneration: %s\nRarity: %s\n",
+        displayText, priceText, genText, rarityText
+    )
+    sendWebhook(msg)
+
+    -- Verifica se passa o limite de preço
+    if priceNumber > limitePrice then
+        print(("[DEBUG] Price acima de %s — iniciando follow."):format(limitePrice))
+
+        -- Envia mensagem para o Discord
+        local msg = string.format(
+            "🚨 Brainrot comprado!\nNome: %s\nPrice: %s\nGeneration: %s\nRarity: %s",
+            displayText, priceText, genText, rarityText
+        )
+        sendWebhookR(msg)
+
+        task.spawn(function()
+            -- Se encontrou o Prompt, dispara
+            if prompt then
+                safeFirePrompt(prompt, 2)
+            end
+            seguirEInteragirAteSumir(model, displayText)
+        end)
+    else
+        print(("[DEBUG] Price abaixo de %s — ignorado."):format(limitePrice))
+    end
+end)
+
+print("[Script] Pronto — agora monitora modelos no formato (ID).Part.Info + ProximityPrompt direto no Model")
