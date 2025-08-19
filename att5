@@ -1,0 +1,73 @@
+--========================================================--
+-- Monitor de Descendentes no Workspace (corrigido)
+--========================================================--
+workspace.ChildAdded:Connect(function(model)
+    if not model:IsA("Model") then return end
+    task.wait(0.5)
+
+    print("[DEBUG] Novo modelo detectado:", model.Name)
+
+    -- Procura um "Part" dentro do modelo
+    local part = model:FindFirstChild("Part")
+    if not part then
+        print("[DEBUG] Nenhum 'Part' encontrado dentro de", model.Name)
+        return
+    end
+
+    -- Dentro do Part deve existir a pasta Info
+    local infoFolder = part:FindFirstChild("Info")
+    if not infoFolder then
+        print("[DEBUG] Nenhuma pasta 'Info' encontrada dentro de", part.Name)
+        return
+    end
+
+    print("[DEBUG] Pasta Info encontrada em:", part.Name)
+
+    -- Captura informações (com checagem extra)
+    local displayLabel = infoFolder:FindFirstChild("DisplayName", true)
+    local displayText = (displayLabel and displayLabel:IsA("TextLabel")) and displayLabel.Text or "N/A"
+    print("[DEBUG] DisplayName encontrado:", displayText)
+
+    local priceLabel = infoFolder:FindFirstChild("Price", true)
+    local priceText = (priceLabel and priceLabel:IsA("TextLabel")) and priceLabel.Text or "0"
+    local priceNumber = parseNumberWithSuffix(priceText)
+    print("[DEBUG] Price encontrado:", priceText, "-> Número:", priceNumber)
+
+    local genLabel = infoFolder:FindFirstChild("Generation", true)
+    local genText = (genLabel and genLabel:IsA("TextLabel")) and genLabel.Text or "N/A"
+    print("[DEBUG] Generation encontrado:", genText)
+
+    local rarityLabel = infoFolder:FindFirstChild("Rarity", true)
+    local rarityText = (rarityLabel and rarityLabel:IsA("TextLabel")) and rarityLabel.Text or "N/A"
+    print("[DEBUG] Rarity encontrado:", rarityText)
+
+    print(("[DEBUG] Modelo completo -> %s | DisplayName: %s | Price: %s | Generation: %s | Rarity: %s")
+        :format(model.Name, displayText, priceText, genText, rarityText))
+
+    -- Envia para o Discord
+    local msg = string.format(
+        "🚨 Brainrot Spawnado!\nNome: %s\nPrice: %s\nGeneration: %s\nRarity: %s\n",
+        displayText, priceText, genText, rarityText
+    )
+    sendWebhook(msg)
+
+    -- Verifica se passa o limite de preço
+    if priceNumber > limitePrice then
+        print(("[DEBUG] Price acima de %s — iniciando follow."):format(limitePrice))
+
+        -- Envia mensagem para o Discord
+        local msg = string.format(
+            "🚨 Brainrot comprado!\nNome: %s\nPrice: %s\nGeneration: %s\nRarity: %s",
+            displayText, priceText, genText, rarityText
+        )
+        sendWebhookR(msg)
+
+        task.spawn(function()
+            seguirEInteragirAteSumir(model, displayText)
+        end)
+    else
+        print(("[DEBUG] Price abaixo de %s — ignorado."):format(limitePrice))
+    end
+end)
+
+print("[Script] Pronto — agora monitora modelos no formato (ID).Part.Info")
