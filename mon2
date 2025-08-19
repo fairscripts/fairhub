@@ -1,0 +1,68 @@
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+
+-- Flag para evitar que o evento seja conectado múltiplas vezes
+local isMonitoring = false
+
+-- Cria a ScreenGui para a interface
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "BillboardMonitorUI"
+screenGui.Parent = player.PlayerGui
+
+-- Cria o painel principal
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 250, 0, 70)
+frame.Position = UDim2.new(0.5, -125, 0.5, -35)
+frame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+frame.BorderSizePixel = 2
+frame.Parent = screenGui
+
+-- Cria o botão para ativar o monitor
+local monitorButton = Instance.new("TextButton")
+monitorButton.Size = UDim2.new(0.8, 0, 0.5, 0)
+monitorButton.Position = UDim2.new(0.1, 0, 0.25, 0)
+monitorButton.BackgroundColor3 = Color3.new(0.3, 0.7, 0.5)
+monitorButton.Text = "Ativar Monitor de BillboardGuis"
+monitorButton.TextColor3 = Color3.new(1, 1, 1)
+monitorButton.Font = Enum.Font.SourceSansBold
+monitorButton.Parent = frame
+
+-- Função para monitorar a criação de novos BillboardGuis
+local function startBillboardGuiMonitor()
+    if isMonitoring then
+        print("O monitor de BillboardGuis já está ativo!")
+        return
+    end
+
+    isMonitoring = true
+    monitorButton.BackgroundColor3 = Color3.new(0.7, 0.3, 0.3)
+    monitorButton.Text = "Monitor ATIVO"
+
+    print("--- Monitor de BillboardGuis ativado! ---")
+    print("O script agora está observando a criação de novos BillboardGuis.")
+    print("--- Listando todos os BillboardGuis existentes: ---")
+
+    -- Faz uma verificação inicial para listar todos os BillboardGuis já existentes
+    local allDescendants = game:GetDescendants()
+    for _, item in ipairs(allDescendants) do
+        if item:IsA("BillboardGui") then
+            print(string.format("  - Encontrado: %s | Local: %s", item.Name, item:GetFullName()))
+        end
+    end
+    print("--------------------------------------------------")
+
+    -- Conecta o evento DescendantAdded para detectar novos BillboardGuis
+    game.DescendantAdded:Connect(function(descendant)
+        if descendant:IsA("BillboardGui") then
+            print("\n-------------------------------")
+            print("Novo BillboardGui detectado!")
+            print(string.format("  - Nome: %s", descendant.Name))
+            print(string.format("  - Localização: %s", descendant:GetFullName()))
+            print("-------------------------------\n")
+        end
+    end)
+end
+
+-- Conecta a função ao evento de clique do botão
+monitorButton.MouseButton1Click:Connect(startBillboardGuiMonitor)
