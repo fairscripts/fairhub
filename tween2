@@ -1,0 +1,56 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait() -- Garante que o personagem existe
+local rootPart = character:WaitForChild("HumanoidRootPart") -- Garante que a HumanoidRootPart existe
+
+-- A função que move o personagem para o modelo
+local function moveToModel(model)
+    local humanoid = character:WaitForChild("Humanoid")
+    
+    local originalWalkSpeed = humanoid.WalkSpeed
+    local originalJumpPower = humanoid.JumpPower
+    
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    
+    local targetCFrame = model.PrimaryPart.CFrame * CFrame.new(0, 5, 0) -- Usa o PrimaryPart do modelo
+    
+    local tweenInfo = TweenInfo.new(
+        1.5,
+        Enum.EasingStyle.Quad,
+        Enum.EasingDirection.Out
+    )
+    
+    local tween = TweenService:Create(rootPart, tweenInfo, {CFrame = targetCFrame})
+    
+    print("Modelo 'Odin Din Din Dun' encontrado! Movendo personagem...")
+    
+    tween.Completed:Connect(function()
+        humanoid.WalkSpeed = originalWalkSpeed
+        humanoid.JumpPower = originalJumpPower
+        print("Movimento concluído. Velocidades restauradas.")
+    end)
+    
+    tween:Play()
+end
+
+-- A função de monitoramento
+local function monitorWorkspace(child)
+    if child and child:IsA("Model") and child.Name == "Odin Din Din Dun" then
+        moveToModel(child)
+    end
+end
+
+-- 1. Verifica se o modelo já existe no Workspace ao iniciar o script
+local existingModel = Workspace:FindFirstChild("Odin Din Din Dun")
+if existingModel then
+    monitorWorkspace(existingModel)
+end
+
+-- 2. Conecta a função de monitoramento para novos modelos
+Workspace.ChildAdded:Connect(monitorWorkspace)
+
+print("Monitoramento de modelo 'Odin Din Din Dun' ativado!")
