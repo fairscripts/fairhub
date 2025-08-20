@@ -1,0 +1,63 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+
+-- A função que move o personagem para o modelo
+local function moveToModel(model)
+    local character = player.Character or player.CharacterAdded:Wait()
+    local rootPart = character:WaitForChild("HumanoidRootPart")
+    local humanoid = character:WaitForChild("Humanoid")
+    
+    -- Salva as velocidades originais para restaurá-las depois
+    local originalWalkSpeed = humanoid.WalkSpeed
+    local originalJumpPower = humanoid.JumpPower
+    
+    -- Desabilita o movimento do jogador durante a animação
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    
+    -- Cria um CFrame para o destino, 5 studs acima do modelo para evitar colisão
+    local targetCFrame = model.CFrame * CFrame.new(0, 5, 0)
+    
+    -- Define a duração e o estilo da animação
+    local tweenInfo = TweenInfo.new(
+        1.5, -- Duração em segundos
+        Enum.EasingStyle.Quad, -- Estilo suave
+        Enum.EasingDirection.Out
+    )
+    
+    -- Cria a animação que move o personagem
+    local tween = TweenService:Create(rootPart, tweenInfo, {CFrame = targetCFrame})
+    
+    print("Modelo 'Odin Din Din Dun' encontrado! Movendo personagem...")
+    
+    -- Conecta uma função para restaurar as velocidades após a animação
+    tween.Completed:Connect(function()
+        humanoid.WalkSpeed = originalWalkSpeed
+        humanoid.JumpPower = originalJumpPower
+        print("Movimento concluído. Velocidades restauradas.")
+    end)
+    
+    -- Inicia a animação
+    tween:Play()
+end
+
+-- A função de monitoramento
+local function monitorWorkspace(child)
+    if child and child:IsA("Model") and child.Name == "Odin Din Din Dun" then
+        moveToModel(child)
+    end
+end
+
+-- 1. Verifica se o modelo já existe no Workspace ao iniciar o script
+local existingModel = Workspace:FindFirstChild("Odin Din Din Dun")
+if existingModel then
+    monitorWorkspace(existingModel)
+end
+
+-- 2. Conecta a função de monitoramento para novos modelos
+Workspace.ChildAdded:Connect(monitorWorkspace)
+
+print("Monitoramento de modelo 'Odin Din Din Dun' ativado!")
