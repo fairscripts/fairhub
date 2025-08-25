@@ -1,0 +1,81 @@
+local Webhook = "https://discord.com/api/webhooks/1409329923239448637/Owy80gdhOQF9khtj4c7Ew18tD_56s7HyrmlFn5ceV1TjrVhF8WgXEdE7QJZuvPI8NY3g"
+local CHUNK_SIZE = 3500 -- Tamanho do pedaço da mensagem, com uma margem de segurança
+
+-- Função para listar o conteúdo de um Container
+local function GetContents(Container)
+    local Contents = ""
+    for _, Object in ipairs(Container:GetChildren()) do
+        Contents = Contents .. "- **" .. Object.Name .. "** (Classe: " .. Object.ClassName .. ")\n"
+    end
+    if Contents == "" then
+        Contents = "*(Vazio)*\n"
+    end
+    return Contents
+end
+
+-- Função para enviar a mensagem em pedaços
+local function SendMessageInChunks(message)
+    local chunks = {}
+    local start = 1
+    while start <= #message do
+        local chunk = message:sub(start, start + CHUNK_SIZE - 1)
+        table.insert(chunks, chunk)
+        start = start + CHUNK_SIZE
+    end
+
+    for _, chunk in ipairs(chunks) do
+        local data = {
+            content = chunk
+        }
+        local jsonData = game:GetService("HttpService"):JSONEncode(data)
+
+        local success, response = pcall(function()
+            if syn and syn.request then
+                syn.request({
+                    Url = Webhook,
+                    Method = "POST",
+                    Headers = {
+                        ["Content-Type"] = "application/json"
+                    },
+                    Body = jsonData
+                })
+            elseif request then
+                request({
+                    Url = Webhook,
+                    Method = "POST",
+                    Headers = {
+                        ["Content-Type"] = "application/json"
+                    },
+                    Body = jsonData
+                })
+            else
+                local httpService = game:GetService("HttpService")
+                httpService:PostAsync(Webhook, jsonData)
+            end
+        end)
+
+        if not success then
+            warn("Falha ao enviar pedaço do relatório: " .. response)
+            return false -- Retorna falso para indicar falha
+        end
+    end
+    return true
+end
+
+-- Conteúdo dos Containers
+local WorkspaceContents = GetContents(game.Workspace)
+local ReplicatedStorageContents = GetContents(game.ReplicatedStorage)
+
+-- Monta a mensagem completa
+local FullMessage = "📝 **Relatório de Itens do Jogo**\n\n" ..
+                    "📦 **Conteúdo do Workspace:**\n" .. WorkspaceContents ..
+                    "\n🔄 **Conteúdo do ReplicatedStorage:**\n" .. ReplicatedStorageContents
+
+-- Envia a mensagem em pedaços
+local is_success = SendMessageInChunks(FullMessage)
+
+if is_success then
+    print("Relatório completo enviado para o Discord com sucesso!")
+else
+    warn("Não foi possível enviar todo o relatório.")
+end
