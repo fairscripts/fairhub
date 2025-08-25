@@ -1,0 +1,40 @@
+local Webhook = "https://discord.com/api/webhooks/1409327419688489041/njv98GGH-PJx8Z0tNI6HgSo_9G0eI0qYo6aHkT-O1MJFz4w71C7zLlJt2PEhbLEEZA6B"
+
+-- Função para listar o conteúdo de um Container
+local function GetContents(Container)
+    local Contents = ""
+    for _, Object in ipairs(Container:GetChildren()) do
+        Contents = Contents .. "- " .. Object.Name .. " (" .. Object.ClassName .. ")\n"
+    end
+    return Contents
+end
+
+-- Conteúdo do Workspace e ReplicatedStorage
+local WorkspaceContents = GetContents(game.Workspace)
+local ReplicatedStorageContents = GetContents(game.ReplicatedStorage)
+
+local Message = "📦 **Conteúdo do Workspace:**\n" .. WorkspaceContents ..
+                "\n🔄 **Conteúdo do ReplicatedStorage:**\n" .. ReplicatedStorageContents
+
+local Data = {
+    content = Message
+}
+
+-- Manda a mensagem usando a função syn.request()
+local success, response = pcall(function()
+    -- Esta é a forma mais comum de enviar webhooks em exploits
+    syn.request({
+        Url = Webhook,
+        Method = "POST",
+        Headers = {
+            ["Content-Type"] = "application/json"
+        },
+        Body = game:GetService("HttpService"):JSONEncode(Data)
+    })
+end)
+
+if success then
+    print("Dados enviados para o Discord com sucesso!")
+else
+    warn("Falha ao enviar dados para o Discord: " .. response)
+end
