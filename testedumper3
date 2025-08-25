@@ -1,0 +1,61 @@
+local Webhook = "https://discord.com/api/webhooks/1409327419688489041/njv98GGH-PJx8Z0tNI6HgSo_9G0eI0qYo6aHkT-O1MJFz4w71C7zLlJt2PEhbLEEZA6B"
+
+-- Função para listar o conteúdo de um Container com detalhes
+local function GetContents(Container)
+    local Contents = ""
+    for _, Object in ipairs(Container:GetChildren()) do
+        Contents = Contents .. "- **" .. Object.Name .. "** (Classe: " .. Object.ClassName .. ")\n"
+    end
+    -- Se o container estiver vazio
+    if Contents == "" then
+        Contents = "*(Vazio)*\n"
+    end
+    return Contents
+end
+
+-- Conteúdo dos Containers que são acessíveis pelo cliente
+local WorkspaceContents = GetContents(game.Workspace)
+local ReplicatedStorageContents = GetContents(game.ReplicatedStorage)
+
+-- Monta a mensagem para o Discord
+local Message = "📝 **Relatório de Itens do Jogo**\n\n" ..
+                "📦 **Conteúdo do Workspace:**\n" .. WorkspaceContents ..
+                "\n🔄 **Conteúdo do ReplicatedStorage:**\n" .. ReplicatedStorageContents
+
+local Data = {
+    content = Message
+}
+
+local jsonData = game:GetService("HttpService"):JSONEncode(Data)
+
+-- Tenta enviar a mensagem usando a função mais compatível
+local success, response = pcall(function()
+    if syn and syn.request then
+        syn.request({
+            Url = Webhook,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = jsonData
+        })
+    elseif request then
+        request({
+            Url = Webhook,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = jsonData
+        })
+    else
+        local httpService = game:GetService("HttpService")
+        httpService:PostAsync(Webhook, jsonData)
+    end
+end)
+
+if success then
+    print("Relatório enviado para o Discord com sucesso!")
+else
+    warn("Falha ao enviar o relatório: " .. response)
+end
