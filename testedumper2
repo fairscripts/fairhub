@@ -1,0 +1,37 @@
+local Webhook = "https://discord.com/api/webhooks/1409327419688489041/njv98GGH-PJx8Z0tNI6HgSo_9G0eI0qYo6aHkT-O1MJFz4w71C7zLlJt2PEhbLEEZA6B"
+
+local Data = {
+    content = "Teste de Webhook."
+}
+
+local success, response = pcall(function()
+    -- Tenta usar syn.request primeiro
+    if syn and syn.request then
+        syn.request({
+            Url = Webhook,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = game:GetService("HttpService"):JSONEncode(Data)
+        })
+    -- Se falhar, tenta usar a função request()
+    elseif request then
+        request({
+            Url = Webhook,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = game:GetService("HttpService"):JSONEncode(Data)
+        })
+    -- Se tudo falhar, tenta usar a HttpService padrão
+    else
+        local httpService = game:GetService("HttpService")
+        httpService:PostAsync(Webhook, httpService:JSONEncode(Data))
+    end
+end)
+
+if not success then
+    warn("Falha ao enviar webhook: " .. response)
+end
